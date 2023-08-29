@@ -19,6 +19,3 @@ run/cache/*.png
 run/saves/*
 run/screenshots/*
 
-# tmp
-
-lib/_misc/*
