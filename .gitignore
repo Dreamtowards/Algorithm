@@ -1,0 +1,24 @@
+
+*.DS_Store
+
+cmake-build-debug/*
+cmake-build-release/*
+
+# MSVC
+out/
+.vs/
+
+run/bin/macos-x86-64/*
+run/bin/darwin-x64/*
+run/bin/windows-amd64/*
+
+run/settings.json
+run/imgui.ini
+
+run/cache/*.png
+run/saves/*
+run/screenshots/*
+
+# tmp
+
+lib/_misc/*
