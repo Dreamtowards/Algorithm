@@ -12,6 +12,7 @@
 #define VKX_BACKEND VKX_BACKEND_eGLFW
 
 #include <functional>
+#include <iostream>   // for default DebugMessengerCallback impl.
 
 
 namespace vkx
@@ -30,9 +31,7 @@ namespace vkx
 		int height;
 
 
-		Image() {}
-
-		Image(vk::Image image, vk::DeviceMemory imageMemory, vk::Format format, int width, int height, vk::ImageView imageView) :
+		Image(vk::Image image = {}, vk::DeviceMemory imageMemory = {}, vk::Format format = {}, int width = 0, int height = 0, vk::ImageView imageView = {}) :
 			image(image), imageMemory(imageMemory), format(format), width(width), height(height), imageView(imageView) {}
 
 	};
@@ -102,7 +101,25 @@ namespace vkx
 			vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, 
 			vk::DebugUtilsMessageTypeFlagsEXT messageType,
 			const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData
-		)> DebugMessengerCallback = [](auto, auto, auto) {};
+		)> DebugMessengerCallback = [](auto messageSeverity, auto messageType, auto pCallbackData)
+			{
+				const char* sSERV = "VERBO";
+				if (messageSeverity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) sSERV = "INFO";
+				else if (messageSeverity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) sSERV = "WARN";
+				else if (messageSeverity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) sSERV = "ERROR";
+
+				const char* sTYPE = "GENERAL";
+				if (messageType == vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation) sTYPE = "VALIDATION";
+				else if (messageType == vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance) sTYPE = "PERFORMANCE";
+				else if (messageType == vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding) sTYPE = "DeviceAddressBinding";
+
+				if (messageSeverity != vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose &&
+					messageType		!= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral)
+				{
+					std::cerr << "VkDebugMessenger[" << sSERV << "][" << sTYPE << "]: " << pCallbackData->pMessage << std::endl;
+					std::cerr.flush();
+				}
+			};
 	};
 
 	// Instance Context. available once vkx::Init() initialized.

@@ -84,14 +84,6 @@ static void Init()
     //AudioEngine::init();
     //NetworkSystem::init();
 
-    uint32_t glfwRequiredInstExtensionsCount = 0;
-    const char** glfwRequiredInstExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredInstExtensionsCount);
-    std::vector<const char*> instExtensions;
-    for (int i = 0; i < glfwRequiredInstExtensionsCount; ++i)
-    {
-        instExtensions.push_back(glfwRequiredInstExtensions[i]);
-    }
-
     vkx::Init(Window::Handle(), true);
 
 
@@ -158,15 +150,23 @@ static void Destroy()
 
 static void RunMainLoop()
 {
+    if (Window::IsCloseRequested())
+        Ethertia::Shutdown();
 
 
     Window::PollEvents();
 }
 
 
-bool& Ethertia::IsRunning() {
+bool& Ethertia::IsRunning() 
+{
     static bool g_Running = false;
     return g_Running;
+}
+
+void Ethertia::Shutdown()
+{
+    Ethertia::IsRunning() = false;
 }
 
 /*

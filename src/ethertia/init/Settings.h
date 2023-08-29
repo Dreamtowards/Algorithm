@@ -50,7 +50,7 @@ public:
     inline static bool  s_Vsync = true;
 
     // Interval(sec) of Breaking Terrain in Creative Mode.
-    inline static float gInterval_BreakingTerrain_CreativeMode = 0.2;
+    inline static float gInterval_BreakingTerrain_CreativeMode = 0.2f;
 
 
     // Interval(sec) of Re-Render ShadowMap's DepthMap. (which kanda expensive.)

@@ -485,22 +485,21 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL _DebugMessengerCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, 
     void* pUserData) 
 {
-
-    const char* MSG_SERV = "VERBO";
-    if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) MSG_SERV = "INFO";
-    else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) MSG_SERV = "WARN";
-    else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) MSG_SERV = "ERROR";
-
-    const char* MSG_TYPE = "GENERAL";
-    if (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) MSG_TYPE = "VALIDATION";
-    else if (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) MSG_TYPE = "PERFORMANCE";
-
-    if (messageSeverity != VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
-    {
-        std::cerr << "VkLayer[" << MSG_SERV << "][" << MSG_TYPE  << "]: " << pCallbackData->pMessage << std::endl;
-
-        std::cerr.flush();
-    }
+    //const char* MSG_SERV = "VERBO";
+    //if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) MSG_SERV = "INFO";
+    //else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) MSG_SERV = "WARN";
+    //else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) MSG_SERV = "ERROR";
+    //
+    //const char* MSG_TYPE = "GENERAL";
+    //if (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) MSG_TYPE = "VALIDATION";
+    //else if (messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) MSG_TYPE = "PERFORMANCE";
+    //
+    //if (messageSeverity != VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
+    //{
+    //    std::cerr << "VkLayer[" << MSG_SERV << "][" << MSG_TYPE  << "]: " << pCallbackData->pMessage << std::endl;
+    //
+    //    std::cerr.flush();
+    //}
 
     vkx::ctx().DebugMessengerCallback(
         static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity), 
@@ -683,10 +682,9 @@ static vk::Device _CreateLogicalDevice(
     deviceInfo.queueCreateInfoCount = arrQueueCreateInfo.size();
 
     // Device Features
-    //VkPhysicalDeviceFeatures deviceFeatures{};
-    //vkGetPhysicalDeviceFeatures(physDevice, &deviceFeatures);
-    //deviceFeatures.samplerAnisotropy = VK_TRUE;
-    //createInfo.pEnabledFeatures = &deviceFeatures;
+    vk::PhysicalDeviceFeatures deviceFeatures = vkx::ctx().PhysDeviceFeatures;
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceInfo.pEnabledFeatures = &deviceFeatures;
 
     // Device Extensions  (needs check is supported?)
     std::vector<const char*> deviceExtensions = {
@@ -771,8 +769,8 @@ static void _CreateSyncObjects()
 
 
 static vk::RenderPass _CreateMainRenderPass(
-    vk::Format swapchainImageFormat = vkx::ctx().SwapchainSurfaceFormat.format,
-    vk::Format depthFormat = vkx::ctx().SwapchainDepthImage.format)
+    vk::Format imageFormat  = vkx::ctx().SwapchainSurfaceFormat.format,
+    vk::Format depthFormat  = vkx::ctx().SwapchainDepthImage.format)
 {
     vk::SubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -787,7 +785,7 @@ static vk::RenderPass _CreateMainRenderPass(
 
     return vkx::CreateRenderPass(
         {{
-            vkx::IAttachmentDesc(swapchainImageFormat, vk::ImageLayout::ePresentSrcKHR),
+            vkx::IAttachmentDesc(imageFormat, vk::ImageLayout::ePresentSrcKHR),
             vkx::IAttachmentDesc(depthFormat, vk::ImageLayout::eDepthStencilAttachmentOptimal)
         }},
         vkx::IGraphicsSubpass(
@@ -962,7 +960,7 @@ void vkx::Init(
     i.SwapchainDepthImageFormat = _FindDepthFormat();
 
     // dependent by CreateSwapchinFramebuffers
-    _CreateMainRenderPass();
+    i.MainRenderPass = _CreateMainRenderPass();
 
     // Create Swapchain
     vkx::RecreateSwapchain(true);
