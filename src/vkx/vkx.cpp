@@ -770,7 +770,7 @@ static void _CreateSyncObjects()
 
 static vk::RenderPass _CreateMainRenderPass(
     vk::Format imageFormat  = vkx::ctx().SwapchainSurfaceFormat.format,
-    vk::Format depthFormat  = vkx::ctx().SwapchainDepthImage.format)
+    vk::Format depthFormat  = vkx::ctx().SwapchainDepthImageFormat)
 {
     vk::SubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
