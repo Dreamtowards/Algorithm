@@ -64,6 +64,23 @@ int main(int argc, char** argv, char** envp)
 //static Profiler     g_Profiler;
 //static Camera       g_Camera;
 
+struct Sth
+{
+    ~Sth()
+    {
+        Log::info("~Sth EndInnerExpr");
+    }
+};
+
+const int* SomeOnStackNum(slice_t<Sth> n)
+{
+    int Waste = 3;
+    int Waste2 = 4;
+    int Waste5 = 5;
+    int Waste6[50]{};
+    Log::info("Func");
+    return &Waste;
+}
 
 static void Init()
 {
@@ -77,6 +94,11 @@ static void Init()
     //    ModLoader::loadMod(modpath);
     //}
     //OpenVR::init();
+
+    //Log::info("Test: {}", *SomeOnStackNum({ 10 ,1,2,3 }) + *SomeOnStackNum({20, 1,2,3,4,5,6,7}));
+    //std::exit(1);
+    Log::info("Test: {}", *SomeOnStackNum(Sth()));
+    std::exit(1);
 
     Ethertia::IsRunning() = true;
 
@@ -175,8 +197,7 @@ static void RunMainLoop()
         device.resetFences(vkxc.CommandBufferFences[fif_i]);  // reset the fence to the unsignaled state
 
         cmd.reset();
-        auto tmp1 = vkx::ICommandBufferBegin(vk::CommandBufferUsageFlagBits::eSimultaneousUse);
-        cmd.begin(tmp1);
+        cmd.begin(vkx::ICommandBufferBegin(vk::CommandBufferUsageFlagBits::eSimultaneousUse));  // may BUG
     }
 
 
@@ -198,14 +219,13 @@ static void RunMainLoop()
     //beginInfo.clearValueCount = 2;// clearValues.size();
     //beginInfo.pClearValues = clearValues;// .data();
 
-    auto tmp2 =
+    cmd.beginRenderPass(
         vkx::IRenderPassBegin(
             vkxc.MainRenderPass,
             vkxc.SwapchainFramebuffers[vkxc.CurrentSwapchainImage],
             vkxc.SwapchainExtent,
-            clearValues);
-    cmd.beginRenderPass(tmp2,
-        vk::SubpassContents::eInline);
+            clearValues),
+        vk::SubpassContents::eInline);  // may BUG
 
     //cmd.CmdSetViewport(vkx::ctx().SwapchainExtent);
     //cmd.CmdSetScissor(vkx::ctx().SwapchainExtent);
