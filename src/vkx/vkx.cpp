@@ -26,6 +26,24 @@ const VkResult& vkx::check(const VkResult& r)
 
 #define VKX_CHECK(result) vkx::check(result)
 
+uint32_t vkx::FormatSize(vk::Format fmt)
+{
+    switch (fmt) {
+    case vk::Format::eR16Sfloat:         
+        return 2;
+    case vk::Format::eR32Sfloat:          
+        return 4;
+    case vk::Format::eR16G16B16Sfloat:  
+        return 6;
+    case vk::Format::eR16G16B16A16Sfloat:
+        return 8;
+    case vk::Format::eR32G32B32Sfloat:    
+        return 12;
+    case vk::Format::eR32G32B32A32Sfloat:
+        return 16;
+    default: throw std::runtime_error("vkx::FormatSize Error: Unsupported format");
+    }
+}
 
 #pragma endregion
 
@@ -126,10 +144,10 @@ void vkx::SubmitCommandBuffer(
 
 void vkx::QueueSubmit(
     vk::Queue queue, 
-    slice_t<vk::CommandBuffer> cmdbufs,
-    slice_t<vk::Semaphore> waits,
-    slice_t<vk::PipelineStageFlags> waitStages,  // vk::PipelineStageFlagBits::eColorAttachmentOutput
-    slice_t<vk::Semaphore> signals,
+    vkx_slice_t<vk::CommandBuffer> cmdbufs,
+    vkx_slice_t<vk::Semaphore> waits,
+    vkx_slice_t<vk::PipelineStageFlags> waitStages,  // vk::PipelineStageFlagBits::eColorAttachmentOutput
+    vkx_slice_t<vk::Semaphore> signals,
     vk::Fence fence)
 {
     vk::SubmitInfo submitInfo{};
@@ -150,9 +168,9 @@ void vkx::QueueSubmit(
 
 vk::Result vkx::QueuePresentKHR(
     vk::Queue presentQueue,
-    slice_t<vk::Semaphore> waitSemaphores,
-    slice_t<vk::SwapchainKHR> swapchains,
-    slice_t<uint32_t> imageIndices)
+    vkx_slice_t<vk::Semaphore> waitSemaphores,
+    vkx_slice_t<vk::SwapchainKHR> swapchains,
+    vkx_slice_t<uint32_t> imageIndices)
 {
     vk::PresentInfoKHR presentInfo{};
     presentInfo.waitSemaphoreCount = waitSemaphores.size();
@@ -386,9 +404,9 @@ vkx::Image vkx::CreateDepthImage(int width, int height)
 #pragma region RenderPass, Framebuffer
 
 vk::RenderPass vkx::CreateRenderPass(
-    slice_t<const vk::AttachmentDescription> attachments,
-    slice_t<const vk::SubpassDescription> subpasses,
-    slice_t<const vk::SubpassDependency> dependencies)
+    vkx_slice_t<const vk::AttachmentDescription> attachments,
+    vkx_slice_t<const vk::SubpassDescription> subpasses,
+    vkx_slice_t<const vk::SubpassDependency> dependencies)
 {
     VKX_CTX_device_allocator;
 
@@ -431,7 +449,7 @@ vk::AttachmentReference vkx::IAttachmentRef(
 }
 
 vk::SubpassDescription vkx::IGraphicsSubpass(
-    slice_t<const vk::AttachmentReference> colorAttachmentRefs,
+    vkx_slice_t<const vk::AttachmentReference> colorAttachmentRefs,
     const vk::AttachmentReference& depthStencilAttachment)
 {
     vk::SubpassDescription subpass{};
@@ -469,7 +487,7 @@ vk::RenderPassBeginInfo vkx::IRenderPassBegin(
     vk::RenderPass renderPass,
     vk::Framebuffer framebuffer,
     vk::Extent2D renderAreaExtent,
-    slice_t<vk::ClearValue> clearValues)
+    vkx_slice_t<vk::ClearValue> clearValues)
 {
     vk::RenderPassBeginInfo beginInfo{};
     beginInfo.renderPass = renderPass;
@@ -482,10 +500,20 @@ vk::RenderPassBeginInfo vkx::IRenderPassBegin(
     return beginInfo;
 }
 
+vk::ClearValue vkx::ClearValueColor(float r, float g, float b, float a)
+{
+    return vk::ClearValue{ .color = {{{r,g,b,a}}} };
+}
+vk::ClearValue vkx::ClearValueDepthStencil(float depth, uint32_t stencil)
+{
+    return vk::ClearValue{ .depthStencil = {depth, stencil} };
+}
+
+
 vk::Framebuffer vkx::CreateFramebuffer(
     vk::Extent2D wh,
     vk::RenderPass renderPass, 
-    slice_t<const vk::ImageView> attachments)
+    vkx_slice_t<const vk::ImageView> attachments)
 {
     VKX_CTX_device_allocator;
 
@@ -501,6 +529,98 @@ vk::Framebuffer vkx::CreateFramebuffer(
 }
 
 #pragma endregion
+
+
+vk::PipelineVertexInputStateCreateInfo IPipelineVertexInputState(
+    std::initializer_list<vk::Format> attribsFormats,
+    uint32_t attribBinding,
+    vk::VertexInputBindingDescription& bindingDesc,
+    std::vector<vk::VertexInputAttributeDescription>& attribsDesc)
+{
+    attribsDesc.resize(attribsFormats.size());
+    uint32_t i = 0;
+    uint32_t offset = 0;
+    for (vk::Format attrib_format : attribsFormats)
+    {
+        attribsDesc[i] = VkVertexInputAttributeDescription{
+                .location = i,
+                .binding = attribBinding,
+                .format = attrib_format,
+                .offset = offset
+        };
+        offset += FormatSize(attrib_format);
+        ++i;
+    }
+
+    bindingDesc = {};
+    bindingDesc.binding = attribBinding;
+    bindingDesc.stride = offset;
+    bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    vk::PipelineVertexInputStateCreateInfo vertexInputState{};
+    vertexInputState.vertexBindingDescriptionCount = attribsFormats.size() ? 1 : 0;  // if no attribs info, this is an empty vertex input, so set 0.
+    vertexInputState.pVertexBindingDescriptions = &bindingDesc;
+    vertexInputState.vertexAttributeDescriptionCount = attribsDesc.size();
+    vertexInputState.pVertexAttributeDescriptions = attribsDesc.data();
+
+    return vertexInputState;
+}
+
+vk::Pipeline CreateGraphicsPipeline(
+    vkx_slice_t<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> shaderStageSources,
+    std::initializer_list<vk::Format> vertexInputAttribsFormats,
+    vk::PrimitiveTopology topology  //vk::PrimitiveTopology::eTriangleList
+)
+{
+    std::vector<vk::PipelineShaderStageCreateInfo> shaderStages(shaderStageSources.size());
+    for (int i = 0; i < shaderStagesSources.size(); ++i) {
+        shaderStages[i] = vl::CreateShaderModule_IPipelineShaderStage(device, shaderStagesSources[i].second, shaderStagesSources[i].first);
+    }
+
+
+    vk::GraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.stageCount = shaderStages.size();
+    pipelineInfo.pStages = shaderStages.data();
+    pipelineInfo.pVertexInputState = &vertexInputState;
+    pipelineInfo.pInputAssemblyState = &inputAssemblyState;
+    pipelineInfo.pTessellationState = pTessellationState;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizationState;
+    pipelineInfo.pMultisampleState = &multisampleState;
+    pipelineInfo.pDepthStencilState = &depthStencilState;
+    pipelineInfo.pColorBlendState = &colorBlendState;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = layout;
+    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.subpass = subpass;
+    pipelineInfo.basePipelineHandle = basePipelineHandle;
+    pipelineInfo.basePipelineIndex = basePipelineIndex;
+    return pipelineInfo;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

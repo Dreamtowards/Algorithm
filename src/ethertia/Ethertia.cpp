@@ -64,23 +64,6 @@ int main(int argc, char** argv, char** envp)
 //static Profiler     g_Profiler;
 //static Camera       g_Camera;
 
-struct Sth
-{
-    ~Sth()
-    {
-        Log::info("~Sth EndInnerExpr");
-    }
-};
-
-const int* SomeOnStackNum(slice_t<Sth> n)
-{
-    int Waste = 3;
-    int Waste2 = 4;
-    int Waste5 = 5;
-    int Waste6[50]{};
-    Log::info("Func");
-    return &Waste;
-}
 
 static void Init()
 {
@@ -95,10 +78,6 @@ static void Init()
     //}
     //OpenVR::init();
 
-    //Log::info("Test: {}", *SomeOnStackNum({ 10 ,1,2,3 }) + *SomeOnStackNum({20, 1,2,3,4,5,6,7}));
-    //std::exit(1);
-    Log::info("Test: {}", *SomeOnStackNum(Sth()));
-    std::exit(1);
 
     Ethertia::IsRunning() = true;
 
@@ -113,6 +92,8 @@ static void Init()
     Log::info("vulkan {}.{}.{}, {}",
         VK_API_VERSION_MAJOR(vkApiVersion), VK_API_VERSION_MINOR(vkApiVersion), VK_API_VERSION_PATCH(vkApiVersion),
         (const char*)vkx::ctx().PhysDeviceProperties.deviceName);
+
+
 
 //    // Materials & Items
 //    MaterialMeshes::load();
@@ -201,31 +182,16 @@ static void RunMainLoop()
     }
 
 
-    vk::ClearValue clearValues[2]{};
-
-    clearValues[0].color = {{{ 0.0f, 0.5f, 0.0f, 1.0f }}};
-    clearValues[1].depthStencil = { 1.0f, 0 };
-
-    //cmd.CmdBeginRenderPass(vkx::ctx().MainRenderPass, vkx::ctx().SwapchainFramebuffers[vkx::CurrentSwapchainImage],
-    //    vkx::ctx().SwapchainExtent, { clearValues, 2 });
-
-
-    //vk::RenderPassBeginInfo beginInfo{};
-    //beginInfo.renderPass = renderPass;
-    //beginInfo.framebuffer = framebuffer;
-    //beginInfo.renderArea.offset = { 0, 0 };
-    //beginInfo.renderArea.extent = renderAreaExtent;
-
-    //beginInfo.clearValueCount = 2;// clearValues.size();
-    //beginInfo.pClearValues = clearValues;// .data();
-
     cmd.beginRenderPass(
         vkx::IRenderPassBegin(
             vkxc.MainRenderPass,
             vkxc.SwapchainFramebuffers[vkxc.CurrentSwapchainImage],
             vkxc.SwapchainExtent,
-            clearValues),
-        vk::SubpassContents::eInline);  // may BUG
+            {
+                vkx::ClearValueColor(0, 0, 1, 1),
+                vkx::ClearValueDepthStencil(1, 0)
+            }),
+        vk::SubpassContents::eInline);
 
     //cmd.CmdSetViewport(vkx::ctx().SwapchainExtent);
     //cmd.CmdSetScissor(vkx::ctx().SwapchainExtent);

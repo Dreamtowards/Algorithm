@@ -6,7 +6,8 @@
 #include <vulkan/vulkan.hpp>
 
 
-#define slice_t vk::ArrayProxy
+#define vkx_slice_t vk::ArrayProxy
+#define vkx_optional_t vk::Optional
 
 #define VKX_BACKEND_eGLFW 1
 #define VKX_BACKEND VKX_BACKEND_eGLFW
@@ -47,6 +48,8 @@ namespace vkx
 		vkx::check(r.result);
 		return r.value;
 	}
+
+	uint32_t FormatSize(vk::Format fmt);
 
 	#pragma region ctx
 
@@ -189,17 +192,17 @@ namespace vkx
 
 	void QueueSubmit(
 		vk::Queue queue,
-		slice_t<vk::CommandBuffer> cmdbufs,
-		slice_t<vk::Semaphore> waits = {},
-		slice_t<vk::PipelineStageFlags> waitStages = {},  // vk::PipelineStageFlagBits::eColorAttachmentOutput
-		slice_t<vk::Semaphore> signals = {},
+		vkx_slice_t<vk::CommandBuffer> cmdbufs,
+		vkx_slice_t<vk::Semaphore> waits = {},
+		vkx_slice_t<vk::PipelineStageFlags> waitStages = {},  // vk::PipelineStageFlagBits::eColorAttachmentOutput
+		vkx_slice_t<vk::Semaphore> signals = {},
 		vk::Fence fence = {});
 
 	vk::Result QueuePresentKHR(
 		vk::Queue presentQueue,
-		slice_t<vk::Semaphore> waitSemaphores,
-		slice_t<vk::SwapchainKHR> swapchains,
-		slice_t<uint32_t> imageIndices);
+		vkx_slice_t<vk::Semaphore> waitSemaphores,
+		vkx_slice_t<vk::SwapchainKHR> swapchains,
+		vkx_slice_t<uint32_t> imageIndices);
 
 	#pragma endregion
 
@@ -235,9 +238,9 @@ namespace vkx
 	#pragma region RenderPass, Framebuffer
 
 	vk::RenderPass CreateRenderPass(
-		slice_t<const vk::AttachmentDescription> attachments,
-		slice_t<const vk::SubpassDescription> subpasses,
-		slice_t<const vk::SubpassDependency> dependencies = {});
+		vkx_slice_t<const vk::AttachmentDescription> attachments,
+		vkx_slice_t<const vk::SubpassDescription> subpasses,
+		vkx_slice_t<const vk::SubpassDependency> dependencies = {});
 
 	vk::AttachmentDescription IAttachmentDesc(
 		vk::Format format,
@@ -248,7 +251,7 @@ namespace vkx
 		vk::ImageLayout layout);
 
 	vk::SubpassDescription IGraphicsSubpass(
-		slice_t<const vk::AttachmentReference> colorAttachmentRefs,
+		vkx_slice_t<const vk::AttachmentReference> colorAttachmentRefs,
 		const vk::AttachmentReference& depthStencilAttachment = {});
 
 	vk::SubpassDependency ISubpassDependency(
@@ -262,13 +265,18 @@ namespace vkx
 		vk::RenderPass renderPass,
 		vk::Framebuffer framebuffer,
 		vk::Extent2D renderAreaExtent,
-		slice_t<vk::ClearValue> clearValues);
+		vkx_slice_t<vk::ClearValue> clearValues);
+
+	vk::ClearValue ClearValueColor(float r = 0, float g = 0, float b = 0, float a = 1);
+
+	vk::ClearValue ClearValueDepthStencil(float depth = 1.0f, uint32_t stencil = 0);
 
 	vk::Framebuffer CreateFramebuffer(
 		vk::Extent2D wh,
 		vk::RenderPass renderPass,
-		slice_t<const vk::ImageView> attachments);
+		vkx_slice_t<const vk::ImageView> attachments);
 
 	#pragma endregion
+
 
 }
