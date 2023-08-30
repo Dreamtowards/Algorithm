@@ -6,7 +6,8 @@
 
 #include <ethertia/render/Window.h>
 #include <ethertia/init/Settings.h>
-#include <ethertia/util/BenchmarkTimer.h>/*
+#include <ethertia/util/BenchmarkTimer.h>
+#include <ethertia/util/Log.h>/*
 #include <ethertia/render/RenderEngine.h>
 #include <ethertia/world/World.h>
 #include <ethertia/util/Loader.h>
@@ -86,6 +87,10 @@ static void Init()
 
     vkx::Init(Window::Handle(), true);
 
+    uint32_t vkApiVersion = vkx::ctx().PhysDeviceProperties.apiVersion;
+    Log::info("vulkan {}.{}.{}, {}",
+        VK_API_VERSION_MAJOR(vkApiVersion), VK_API_VERSION_MINOR(vkApiVersion), VK_API_VERSION_PATCH(vkApiVersion),
+        (const char*)vkx::ctx().PhysDeviceProperties.deviceName);
 
 //    // Materials & Items
 //    MaterialMeshes::load();
@@ -153,6 +158,80 @@ static void RunMainLoop()
     if (Window::IsCloseRequested())
         Ethertia::Shutdown();
 
+    VKX_CTX_device;
+    auto& vkxc = vkx::ctx();
+
+    int fif_i = vkxc.CurrentInflightFrame;
+    vk::CommandBuffer cmd = vkxc.CommandBuffers[fif_i];
+
+    {
+        // blocking until the CommandBuffer has finished executing
+        device.waitForFences(vkxc.CommandBufferFences[fif_i], VK_TRUE, UINT64_MAX);
+
+        // acquire swapchain image, and signal SemaphoreImageAcquired[i] when acquired. (when the presentation engine is finished using the image)
+        vkxc.CurrentSwapchainImage =
+            vkx::check(device.acquireNextImageKHR(vkxc.SwapchainKHR, UINT64_MAX, vkxc.SemaphoreImageAcquired[fif_i]));
+
+        device.resetFences(vkxc.CommandBufferFences[fif_i]);  // reset the fence to the unsignaled state
+
+        cmd.reset();
+        auto tmp1 = vkx::ICommandBufferBegin(vk::CommandBufferUsageFlagBits::eSimultaneousUse);
+        cmd.begin(tmp1);
+    }
+
+
+    vk::ClearValue clearValues[2]{};
+
+    clearValues[0].color = {{{ 0.0f, 0.5f, 0.0f, 1.0f }}};
+    clearValues[1].depthStencil = { 1.0f, 0 };
+
+    //cmd.CmdBeginRenderPass(vkx::ctx().MainRenderPass, vkx::ctx().SwapchainFramebuffers[vkx::CurrentSwapchainImage],
+    //    vkx::ctx().SwapchainExtent, { clearValues, 2 });
+
+
+    //vk::RenderPassBeginInfo beginInfo{};
+    //beginInfo.renderPass = renderPass;
+    //beginInfo.framebuffer = framebuffer;
+    //beginInfo.renderArea.offset = { 0, 0 };
+    //beginInfo.renderArea.extent = renderAreaExtent;
+
+    //beginInfo.clearValueCount = 2;// clearValues.size();
+    //beginInfo.pClearValues = clearValues;// .data();
+
+    auto tmp2 =
+        vkx::IRenderPassBegin(
+            vkxc.MainRenderPass,
+            vkxc.SwapchainFramebuffers[vkxc.CurrentSwapchainImage],
+            vkxc.SwapchainExtent,
+            clearValues);
+    cmd.beginRenderPass(tmp2,
+        vk::SubpassContents::eInline);
+
+    //cmd.CmdSetViewport(vkx::ctx().SwapchainExtent);
+    //cmd.CmdSetScissor(vkx::ctx().SwapchainExtent);
+
+    cmd.endRenderPass();
+
+    {
+        cmd.end();
+
+        // Submit the CommandBuffer.
+        // Submission is VerySlow. try Batch Submit as much as possible, and Submit in another Thread
+        vkx::QueueSubmit(vkxc.GraphicsQueue, cmd,
+            vkxc.SemaphoreImageAcquired[fif_i], { vk::PipelineStageFlagBits::eColorAttachmentOutput },
+            vkxc.SemaphoreRenderComplete[fif_i],
+            vkxc.CommandBufferFences[fif_i]);
+
+
+        if (vkx::QueuePresentKHR(vkxc.PresentQueue, vkxc.SemaphoreRenderComplete[fif_i], vkxc.SwapchainKHR, vkxc.CurrentSwapchainImage) == vk::Result::eSuboptimalKHR)
+        {
+            vkx::RecreateSwapchain();
+            Log::info("Recreate Swapchain cause Resized");
+        }
+        //    vkQueueWaitIdle(vkx::ctx().PresentQueue);  // BigWaste on GPU.
+
+        vkxc.CurrentInflightFrame = (vkxc.CurrentInflightFrame + 1) % vkxc.InflightFrames;
+    }
 
     Window::PollEvents();
 }

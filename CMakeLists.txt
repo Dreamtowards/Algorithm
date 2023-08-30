@@ -17,7 +17,6 @@ project(Ethertia)
 include_directories(src)
 
 include_directories(lib/glfw-3.3.8/include)
-include_directories(lib/avk-0.98.1/include)
 
 include_directories(lib/openal-soft/include)
 

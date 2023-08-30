@@ -5,20 +5,23 @@
 #include <sstream>
 #include <set>
 
+
 #pragma region base
 
-#define DECL_CTX_device_allocator const vk::Device& device = vkx::ctx().Device; const vk::AllocationCallbacks* allocator = vkx::ctx().Allocator;
+#define VKX_CTX_device_allocator const vk::Device& device = vkx::ctx().Device; const vk::AllocationCallbacks* allocator = vkx::ctx().Allocator;
 
-void vkx::check(const vk::Result& r)
+const vk::Result& vkx::check(const vk::Result& r)
 {
     if (r != vk::Result::eSuccess)
     {
-        assert(false, "vkx::check() fail.");
+        assert(false && "vkx::check() fail.");
     }
+    return r;
 }
-void vkx::check(const VkResult& r)
+const VkResult& vkx::check(const VkResult& r)
 {
     vkx::check((vk::Result)r);
+    return r;
 }
 
 #define VKX_CHECK(result) vkx::check(result)
@@ -54,7 +57,7 @@ vk::DeviceMemory vkx::AllocateMemory(
     vk::MemoryRequirements memRequirements,  // size, alignment, memoryType
     vk::MemoryPropertyFlags memProperties)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     vk::MemoryAllocateInfo allocInfo{};
     allocInfo.allocationSize = memRequirements.size;
@@ -90,6 +93,12 @@ void vkx::BeginCommandBuffer(
     cmdbuf.begin(vk::CommandBufferBeginInfo{ .flags = usageFlags });
 }
 
+vk::CommandBufferBeginInfo vkx::ICommandBufferBegin(
+    vk::CommandBufferUsageFlags usageFlags)
+{
+    return vk::CommandBufferBeginInfo{ .flags = usageFlags };
+}
+
 void vkx::SubmitCommandBuffer(
     const std::function<void(vk::CommandBuffer)>& fn_record,
     vk::Queue queue,
@@ -117,24 +126,42 @@ void vkx::SubmitCommandBuffer(
 
 void vkx::QueueSubmit(
     vk::Queue queue, 
-    std::span<const vk::CommandBuffer> cmdbufs,
-    std::span<const vk::Semaphore> waits,
-    vk::PipelineStageFlags* waitStages,  // vk::PipelineStageFlagBits::eColorAttachmentOutput
-    std::span<const vk::Semaphore> signals,
+    slice_t<vk::CommandBuffer> cmdbufs,
+    slice_t<vk::Semaphore> waits,
+    slice_t<vk::PipelineStageFlags> waitStages,  // vk::PipelineStageFlagBits::eColorAttachmentOutput
+    slice_t<vk::Semaphore> signals,
     vk::Fence fence)
 {
     vk::SubmitInfo submitInfo{};
     submitInfo.commandBufferCount = cmdbufs.size();
     submitInfo.pCommandBuffers = cmdbufs.data();
 
+    assert(waits.size() == waitStages.size());
     submitInfo.waitSemaphoreCount = waits.size();
     submitInfo.pWaitSemaphores = waits.data();
-    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.pWaitDstStageMask = waitStages.data();
 
     submitInfo.signalSemaphoreCount = signals.size();
     submitInfo.pSignalSemaphores = signals.data();
 
     queue.submit(submitInfo, fence);
+}
+
+
+vk::Result vkx::QueuePresentKHR(
+    vk::Queue presentQueue,
+    slice_t<vk::Semaphore> waitSemaphores,
+    slice_t<vk::SwapchainKHR> swapchains,
+    slice_t<uint32_t> imageIndices)
+{
+    vk::PresentInfoKHR presentInfo{};
+    presentInfo.waitSemaphoreCount = waitSemaphores.size();
+    presentInfo.pWaitSemaphores = waitSemaphores.data();
+    presentInfo.swapchainCount = swapchains.size();
+    presentInfo.pSwapchains = swapchains.data();
+    presentInfo.pImageIndices = imageIndices.data();
+
+    return presentQueue.presentKHR(presentInfo);
 }
 
 #pragma endregion
@@ -153,7 +180,7 @@ void vkx::CreateImage(
     vk::ImageTiling tiling,
     bool isCubeMap)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     vk::ImageCreateInfo imageInfo{};
     imageInfo.imageType = vk::ImageType::e2D;
@@ -189,7 +216,7 @@ vk::ImageView vkx::CreateImageView(
     vk::ImageAspectFlags aspectFlags,
     vk::ImageViewType imageViewType)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     vk::ImageViewCreateInfo viewInfo{};
     viewInfo.viewType = imageViewType;
@@ -213,7 +240,7 @@ vk::Sampler vkx::CreateImageSampler(
     vk::Filter minFilter,
     vk::SamplerAddressMode addressModeUVW)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
     vk::PhysicalDevice physDevice = vkx::ctx().PhysDevice;
     vk::PhysicalDeviceProperties gpuProperties = vkx::ctx().PhysDeviceProperties;
 
@@ -363,7 +390,7 @@ vk::RenderPass vkx::CreateRenderPass(
     slice_t<const vk::SubpassDescription> subpasses,
     slice_t<const vk::SubpassDependency> dependencies)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     vk::RenderPassCreateInfo renderPassInfo{};
     renderPassInfo.attachmentCount = attachments.size();
@@ -438,12 +465,29 @@ vk::SubpassDependency vkx::ISubpassDependency(
 }
 
 
+vk::RenderPassBeginInfo vkx::IRenderPassBegin(
+    vk::RenderPass renderPass,
+    vk::Framebuffer framebuffer,
+    vk::Extent2D renderAreaExtent,
+    slice_t<vk::ClearValue> clearValues)
+{
+    vk::RenderPassBeginInfo beginInfo{};
+    beginInfo.renderPass = renderPass;
+    beginInfo.framebuffer = framebuffer;
+    beginInfo.renderArea.offset = { 0, 0 };
+    beginInfo.renderArea.extent = renderAreaExtent;
+    beginInfo.clearValueCount = clearValues.size();
+    beginInfo.pClearValues = clearValues.data();
+
+    return beginInfo;
+}
+
 vk::Framebuffer vkx::CreateFramebuffer(
     vk::Extent2D wh,
     vk::RenderPass renderPass, 
     slice_t<const vk::ImageView> attachments)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     vk::FramebufferCreateInfo framebufferInfo{};
     framebufferInfo.width = wh.width;
@@ -711,7 +755,7 @@ static vk::Device _CreateLogicalDevice(
 static vk::CommandPool _CreateCommandPool(
     uint32_t queueFamily)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     return device.createCommandPool(
         vk::CommandPoolCreateInfo{
@@ -722,7 +766,7 @@ static vk::CommandPool _CreateCommandPool(
 
 static vk::DescriptorPool _CreateDescriptorPool()
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     // tho kinda oversize.
     vk::DescriptorPoolSize pool_sizes[] =
@@ -751,20 +795,32 @@ static vk::DescriptorPool _CreateDescriptorPool()
 
 static void _CreateSyncObjects()
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     vk::SemaphoreCreateInfo semaphoreInfo{};
 
     vk::FenceCreateInfo fenceInfo{};
     fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled;
 
-    auto& g = vkx::ctx();
-    for (int i = 0; i < g.InflightFrames; ++i)
+    auto& vkxc = vkx::ctx();
+    int fif = vkxc.InflightFrames;
+    vkxc.SemaphoreImageAcquired.resize(fif);
+    vkxc.SemaphoreRenderComplete.resize(fif);
+    vkxc.CommandBufferFences.resize(fif);
+    for (int i = 0; i < fif; ++i)
     {
-        g.SemaphoreImageAcquired[i]  = device.createSemaphore(semaphoreInfo, allocator);
-        g.SemaphoreRenderComplete[i] = device.createSemaphore(semaphoreInfo, allocator);
-        g.CommandBufferFences[i] = device.createFence(fenceInfo, allocator);
+        vkxc.SemaphoreImageAcquired[i]  = device.createSemaphore(semaphoreInfo, allocator);
+        vkxc.SemaphoreRenderComplete[i] = device.createSemaphore(semaphoreInfo, allocator);
+        vkxc.CommandBufferFences[i] = device.createFence(fenceInfo, allocator);
     }
+}
+
+static void _CreateCommandBuffers()
+{
+    auto& vkxc = vkx::ctx();
+    int fif = vkxc.InflightFrames;
+    vkxc.CommandBuffers.resize(fif);
+    vkx::AllocateCommandBuffers(fif, vkxc.CommandBuffers.data(), vk::CommandBufferLevel::ePrimary);
 }
 
 
@@ -812,12 +868,12 @@ static void _CreateSwapchain(
     vkx::Image&                 out_SwapchainDepthImage     = vkx::ctx().SwapchainDepthImage,
     std::vector<vk::Framebuffer>& out_SwapchainFramebuffers = vkx::ctx().SwapchainFramebuffers)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     vk::SurfaceCapabilitiesKHR surfaceCapabilities = physDevice.getSurfaceCapabilitiesKHR(surfaceKHR);
 
     out_SwapchainExtent = surfaceCapabilities.currentExtent;
-    assert(surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max(), "VkxError: invalid VkSurfaceCapabilitiesKHR.currentExtent.width");
+    assert(surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max() && "VkxError: invalid VkSurfaceCapabilitiesKHR.currentExtent.width");
     
     vk::PresentModeKHR surfacePresentMode = vk::PresentModeKHR::eFifo;  // FIFO is vk guaranteed available.
     {
@@ -874,8 +930,8 @@ static void _CreateSwapchain(
     out_SwapchainDepthImage = vkx::CreateDepthImage(out_SwapchainExtent.width, out_SwapchainExtent.height);
 
     // Swapchain Framebuffers
-    out_SwapchainFramebuffers.resize(out_SwapchainImageViews.size());
-    for (size_t i = 0; i < out_SwapchainImageViews.size(); i++)
+    out_SwapchainFramebuffers.resize(swapchainImageCount);
+    for (size_t i = 0; i < swapchainImageCount; i++)
     {
         out_SwapchainFramebuffers[i] = vkx::CreateFramebuffer(out_SwapchainExtent, renderPass,
             { { out_SwapchainImageViews[i], out_SwapchainDepthImage.imageView } });
@@ -888,7 +944,7 @@ static void _DestroySwapchain(
     vkx::Image& swapchainDepthImage = vkx::ctx().SwapchainDepthImage,
     vk::SwapchainKHR swapchainKHR = vkx::ctx().SwapchainKHR)
 {
-    DECL_CTX_device_allocator;
+    VKX_CTX_device_allocator;
 
     //delete swapchainDepthImage;
 
@@ -903,9 +959,10 @@ static void _DestroySwapchain(
 
 void vkx::RecreateSwapchain(bool onlyCreate)
 {
+    vkx::ctx().Device.waitIdle();
+
     if (!onlyCreate)
     {
-        vkDeviceWaitIdle(vkx::ctx().Device);
         _DestroySwapchain();
     }
 
@@ -953,7 +1010,7 @@ void vkx::Init(
 
     i.ImageSampler = vkx::CreateImageSampler();
     _CreateSyncObjects();
-    vkx::AllocateCommandBuffers(i.InflightFrames, i.CommandBuffers, vk::CommandBufferLevel::ePrimary);
+    _CreateCommandBuffers();
 
     // dependent by CreateMainRenderPass
     i.SwapchainSurfaceFormat = i.PhysDevice.getSurfaceFormatsKHR(i.SurfaceKHR).front();  // expected: {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}
@@ -990,7 +1047,7 @@ std::vector<const char*> vkx::_Glfw_GetRequiredInstanceExtensions()
     const char** glfwRequiredInstExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredInstExtensionsCount);
     
     std::vector<const char*> extensions;
-    for (int i = 0; i < glfwRequiredInstExtensionsCount; ++i) 
+    for (uint32_t i = 0; i < glfwRequiredInstExtensionsCount; ++i)
     {
         extensions.push_back(glfwRequiredInstExtensions[i]);
     }

@@ -11,6 +11,8 @@
 #define VKX_BACKEND_eGLFW 1
 #define VKX_BACKEND VKX_BACKEND_eGLFW
 
+#define VKX_CTX_device vk::Device& device = vkx::ctx().Device;
+
 #include <functional>
 #include <iostream>   // for default DebugMessengerCallback impl.
 
@@ -36,11 +38,11 @@ namespace vkx
 
 	};
 
-	void check(const vk::Result& r);
-	void check(const VkResult& r);
+	const vk::Result&	check(const vk::Result& r);
+	const VkResult&		check(const VkResult& r);
 
 	template<typename T>
-	T& check(const vk::ResultValue<T>& r)
+	const T& check(const vk::ResultValue<T>& r)
 	{
 		vkx::check(r.result);
 		return r.value;
@@ -90,12 +92,15 @@ namespace vkx
 
 		vk::Sampler ImageSampler;  // default sampler. VK_FILTER_NEAREST, VK_SAMPLER_ADDRESS_MODE_REPEAT
 
-		static const uint32_t InflightFrames = 3;  // Frames InFlights
-		vk::CommandBuffer CommandBuffers[InflightFrames];
-		vk::Fence CommandBufferFences[InflightFrames];
+		uint32_t CurrentSwapchainImage = 0;
 
-		vk::Semaphore SemaphoreImageAcquired[InflightFrames];
-		vk::Semaphore SemaphoreRenderComplete[InflightFrames];
+		const uint32_t InflightFrames = 3;  // Frames InFlights
+		uint32_t CurrentInflightFrame = 0;
+
+		std::vector<vk::CommandBuffer>	CommandBuffers;
+		std::vector<vk::Fence>			CommandBufferFences;
+		std::vector<vk::Semaphore> SemaphoreImageAcquired;
+		std::vector<vk::Semaphore> SemaphoreRenderComplete;
 
 		std::function<void(
 			vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, 
@@ -116,7 +121,9 @@ namespace vkx
 				if (messageSeverity != vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose &&
 					messageType		!= vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral)
 				{
-					std::cerr << "VkDebugMessenger[" << sSERV << "][" << sTYPE << "]: " << pCallbackData->pMessage << std::endl;
+					std::cerr << "\n============================ VkMSG ["<<sSERV<<"] ["<<sTYPE<<"] @"<<pCallbackData->pMessageIdName<<" ============================\n";
+					std::cerr << "VkDebugMessenger[" << sSERV << "][" << sTYPE << "]: " << pCallbackData->pMessage << "\n";
+					std::cerr <<   "===============================================================\n\n";
 					std::cerr.flush();
 				}
 			};
@@ -168,6 +175,10 @@ namespace vkx
 		vk::CommandBuffer cmdbuf,
 		vk::CommandBufferUsageFlags usageFlags);
 
+	// ICmd
+	vk::CommandBufferBeginInfo ICommandBufferBegin(
+		vk::CommandBufferUsageFlags usageFlags);
+
 
 	// Allocate & Record & Submit Onetime CommandBuffer
 	void SubmitCommandBuffer(
@@ -178,11 +189,17 @@ namespace vkx
 
 	void QueueSubmit(
 		vk::Queue queue,
-		std::span<const vk::CommandBuffer> cmdbufs,
-		std::span<const vk::Semaphore> waits = {},
-		vk::PipelineStageFlags* waitStages = nullptr,  // vk::PipelineStageFlagBits::eColorAttachmentOutput
-		std::span<const vk::Semaphore> signals = {},
+		slice_t<vk::CommandBuffer> cmdbufs,
+		slice_t<vk::Semaphore> waits = {},
+		slice_t<vk::PipelineStageFlags> waitStages = {},  // vk::PipelineStageFlagBits::eColorAttachmentOutput
+		slice_t<vk::Semaphore> signals = {},
 		vk::Fence fence = {});
+
+	vk::Result QueuePresentKHR(
+		vk::Queue presentQueue,
+		slice_t<vk::Semaphore> waitSemaphores,
+		slice_t<vk::SwapchainKHR> swapchains,
+		slice_t<uint32_t> imageIndices);
 
 	#pragma endregion
 
@@ -240,6 +257,12 @@ namespace vkx
 		vk::AccessFlags srcAccessMask, vk::AccessFlags dstAccessMask,
 		vk::DependencyFlags dependencyFlags = {});
 
+	// ICmd
+	vk::RenderPassBeginInfo IRenderPassBegin(
+		vk::RenderPass renderPass,
+		vk::Framebuffer framebuffer,
+		vk::Extent2D renderAreaExtent,
+		slice_t<vk::ClearValue> clearValues);
 
 	vk::Framebuffer CreateFramebuffer(
 		vk::Extent2D wh,
