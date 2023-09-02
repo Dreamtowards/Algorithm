@@ -14,7 +14,7 @@ Engine for Sandbox Game "Ethertia"
 ## Showcase
 
 
-## Getting Started
+## Getting started
 
 - Build & Run
 - Source Overview

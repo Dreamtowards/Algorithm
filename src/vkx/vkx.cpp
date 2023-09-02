@@ -8,7 +8,6 @@
 
 #pragma region base
 
-#define VKX_CTX_device_allocator const vk::Device& device = vkx::ctx().Device; const vk::AllocationCallbacks* allocator = vkx::ctx().Allocator;
 
 const vk::Result& vkx::check(const vk::Result& r)
 {
@@ -1069,8 +1068,7 @@ static void _CreateSyncObjects()
     vk::FenceCreateInfo fenceInfo{};
     fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled;
 
-    auto& vkxc = vkx::ctx();
-    int fif = vkxc.InflightFrames;
+    const int fif = vkxc.InflightFrames;
     vkxc.SemaphoreImageAcquired.resize(fif);
     vkxc.SemaphoreRenderComplete.resize(fif);
     vkxc.CommandBufferFences.resize(fif);
@@ -1204,38 +1202,46 @@ static void _CreateSwapchain(
             { { out_SwapchainImageViews[i], out_SwapchainDepthImage.imageView } });
     }
 }
+static void _DestroyVkxImage(vkx::Image img) {
+
+    VKX_CTX_device_allocator;
+    device.destroyImage(img.image, allocator);
+    device.freeMemory(img.imageMemory, allocator);
+    device.destroyImageView(img.imageView, allocator);
+}
 
 static void _DestroySwapchain(
     const std::vector<vk::Framebuffer>& swapchainFramebuffers = vkx::ctx().SwapchainFramebuffers,
     const std::vector<vk::ImageView>& swapchainImageViews = vkx::ctx().SwapchainImageViews,
-    vkx::Image& swapchainDepthImage = vkx::ctx().SwapchainDepthImage,
+    vkx::Image& depthImage = vkx::ctx().SwapchainDepthImage,
     vk::SwapchainKHR swapchainKHR = vkx::ctx().SwapchainKHR)
 {
     VKX_CTX_device_allocator;
 
-    //delete swapchainDepthImage;
+    _DestroyVkxImage(depthImage);
 
     for (auto fb : swapchainFramebuffers) {
-        vkDestroyFramebuffer(device, fb, nullptr);
+        device.destroyFramebuffer(fb, allocator);
     }
-    for (auto imageview : swapchainImageViews) {
-        vkDestroyImageView(device, imageview, nullptr);
+    for (auto imageView : swapchainImageViews) {
+        device.destroyImageView(imageView, allocator);
     }
-    vkDestroySwapchainKHR(device, swapchainKHR, nullptr);
+    device.destroySwapchainKHR(swapchainKHR, allocator);
 }
 
-void vkx::RecreateSwapchain(bool onlyCreate)
+void vkx::RecreateSwapchain(bool destroy, bool create)
 {
     vkx::ctx().Device.waitIdle();
 
-    if (!onlyCreate)
+    if (destroy)
     {
         _DestroySwapchain();
     }
 
-    _CreateSwapchain();
-    //_CreateSwapchainDepthImage();
-    //_CreateSwapchainFramebuffers();
+    if (create)
+    {
+        _CreateSwapchain();
+    }
 }
 
 
@@ -1287,12 +1293,36 @@ void vkx::Init(
     i.MainRenderPass = _CreateMainRenderPass();
 
     // Create Swapchain
-    vkx::RecreateSwapchain(true);
+    vkx::RecreateSwapchain(false, true);
 }
 
 void vkx::Destroy()
 {
+    VKX_CTX_device_allocator;
 
+    //  Destroy SyncObjects
+    for (int i = 0; i < vkxc.InflightFrames; i++) {
+        device.destroySemaphore(vkxc.SemaphoreImageAcquired[i],     allocator);
+        device.destroySemaphore(vkxc.SemaphoreRenderComplete[i],    allocator);
+        device.destroyFence(vkxc.CommandBufferFences[i], allocator);
+    }
+
+    // Destroy Swapchain
+    vkx::RecreateSwapchain(true, false);
+
+    device.destroyRenderPass(vkxc.MainRenderPass, allocator);
+
+    device.destroyDescriptorPool(vkxc.DescriptorPool, allocator);
+    device.destroyCommandPool(vkxc.CommandPool, allocator);
+    device.destroySampler(vkxc.ImageSampler, allocator);
+
+    device.destroy(allocator);
+    vkxc.Instance.destroySurfaceKHR(vkxc.SurfaceKHR, allocator);
+
+    if (g_DebugUtilsMessengerEXT) {
+        _EXT_DestroyDebugMessenger(vkxc.Instance, g_DebugUtilsMessengerEXT, (VkAllocationCallbacks*)allocator);
+    }
+    vkxc.Instance.destroy(allocator);
 }
 
 #pragma endregion

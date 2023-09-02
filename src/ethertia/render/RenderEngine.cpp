@@ -1,112 +1,90 @@
 //
 // Created by Dreamtowards on 2022/8/22.
 //
-#include <glad/glad.h>
+
 
 #include "RenderEngine.h"
 
-#include <glc.h>
+#include <vkx/vkx.hpp>
 
 #include <ethertia/render/Window.h>
-#include <ethertia/init/ItemTextures.h>
-#include <ethertia/init/Settings.h>
-#include <ethertia/entity/EntityDroppedItem.h>
-#include <ethertia/entity/player/EntityPlayer.h>
-#include <ethertia/init/DebugStat.h>
-
-
-// RenderEngine is static/singleton. shouldn't instantiate.
-// Don't use OOP except it's necessary.
-
 #include <ethertia/imgui/Imgui.h>
+#include <ethertia/util/BenchmarkTimer.h>
+#include <ethertia/util/Log.h>
+#include <ethertia/util/Loader.h>
 
-//    std::cout << " renderers[";
-////    GuiRenderer::init();        std::cout << "gui, ";
-////    FontRenderer::init();       std::cout << "font, ";
-////    GeometryRenderer::init();   std::cout << "geometry ";
-////    ComposeRenderer::init();    std::cout << "deferred ";
-////    SkyboxRenderer::init();     std::cout << "skybox ";
-////    ParticleRenderer::init();   std::cout << "particle ";
-//    //SkyGradientRenderer::init();
-//
-////    SSAORenderer::init();
-////    ShadowRenderer::init();
-//
+static vk::Pipeline g_Pipeline;
+static vk::PipelineLayout g_PipelineLayout;
 
 
 
-#include "renderer/RendererGbuffers.cpp"
-#include "renderer/RendererCompose.cpp"
-#include "renderer/RendererSkybox.cpp"
-
-
-
-void RenderEngine::init()
+void RenderEngine::Init()
 {
     BENCHMARK_TIMER;
     Log::info("RenderEngine initializing..");
 
-#ifdef GL
-    glc::DebugMessageCallback([](glc::DebugMessageCallbackArgs args)
-    {
-        Log::info("glDebugMessageCallback[{}][{}][{}/{}]: {}",
-                  args.source_str,
-                  args.type_str,
-                  args.severity_str, args.id,
-                  args.message);
-    });
-#endif
-
-
-//    ShaderProgram::loadAll();
-
-#ifdef VULKAN
-
-
-    vkx::ctx().DebugMessengerCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData) {
-
-    };
 
     vkx::Init(Window::Handle(), true);
 
     uint32_t vkApiVersion = vkx::ctx().PhysDeviceProperties.apiVersion;
-    Log::info("vulkan {}.{}.{}, gpu: {}",
-              VK_API_VERSION_MAJOR(vkApiVersion),
-              VK_API_VERSION_MINOR(vkApiVersion),
-              VK_API_VERSION_PATCH(vkApiVersion),
-              vkx::ctx().PhysDeviceProperties.deviceName);
+    Log::info("vulkan {}.{}.{}, {}",
+        VK_API_VERSION_MAJOR(vkApiVersion), VK_API_VERSION_MINOR(vkApiVersion), VK_API_VERSION_PATCH(vkApiVersion),
+        (const char*)vkx::ctx().PhysDeviceProperties.deviceName);
 
-    TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));
-    TEX_UVMAP = Loader::loadTexture("misc/uvmap.png");
+    Imgui::Init();
 
-    Materials::registerMaterialItems();  // before items tex load.
-    MaterialTextures::load();
 
-    RendererGbuffer::init();
+    g_PipelineLayout = vkx::CreatePipelineLayout({});
 
-    RendererCompose::init(RendererGbuffer::gPosition.Image->m_ImageView,
-                          RendererGbuffer::gNormal.Image->m_ImageView,
-                          RendererGbuffer::gAlbedo.Image->m_ImageView);
+    g_Pipeline = vkx::CreateGraphicsPipeline(
+        {
+            {Loader::LoadFile("./shaders/test/vert.spv"), vk::ShaderStageFlagBits::eVertex},
+            {Loader::LoadFile("./shaders/test/frag.spv"), vk::ShaderStageFlagBits::eFragment}
+        },
+       {
+           //vk::Format::eR32G32B32Sfloat
+       },
+       g_PipelineLayout,
+        {},
+        vkx::ctx().MainRenderPass);
 
-    g_ComposeView = RendererCompose::g_FramebufferAttachmentColor.Image->m_ImageView;
+
+    //TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));
+    //TEX_UVMAP = Loader::loadTexture("misc/uvmap.png");
+
+    //Materials::registerMaterialItems();  // before items tex load.
+    //MaterialTextures::load();
+    //RendererGbuffer::init();
+    //
+    //RendererCompose::init(RendererGbuffer::gPosition.Image->m_ImageView,
+    //                      RendererGbuffer::gNormal.Image->m_ImageView,
+    //                      RendererGbuffer::gAlbedo.Image->m_ImageView);
+    //
+    //g_ComposeView = RendererCompose::g_FramebufferAttachmentColor.Image->m_ImageView;
             // RendererGbuffer::gAlbedo.Image->m_ImageView;
-#endif
 
     Log::info("RenderEngine initialized.\1");
 }
 
 
-void RenderEngine::deinit()
+void RenderEngine::Destroy()
 {
-    vkDeviceWaitIdle(vkx::ctx().Device);  // blocking.
+    VKX_CTX_device_allocator;
 
-    MaterialTextures::clean();
-    ItemTextures::clean();
+    device.waitIdle();
 
-    RendererGbuffer::deinit();
+    device.destroyPipeline(g_Pipeline, allocator);
+    device.destroyPipelineLayout(g_PipelineLayout, allocator);
 
-    delete TEX_WHITE;
-    delete TEX_UVMAP;
+    //MaterialTextures::clean();
+    //ItemTextures::clean();
+    //
+    //RendererGbuffer::deinit();
+    //
+    //delete TEX_WHITE;
+    //delete TEX_UVMAP;
+
+    Imgui::Destroy();
 
     vkx::Destroy();
 }
@@ -115,35 +93,72 @@ void RenderEngine::deinit()
 
 void RenderEngine::Render()
 {
-    VkCommandBuffer cmdbuf;
+    Imgui::NewFrame();
+
+    VKX_CTX_device;
+    auto& vkxc = vkx::ctx();
+
+    int fif_i = vkxc.CurrentInflightFrame;
+    vk::CommandBuffer cmd = vkxc.CommandBuffers[fif_i];
+
     {
-        PROFILE("BeginFrame");
-        vkx::BeginFrame(&cmdbuf);
+        // blocking until the CommandBuffer has finished executing
+        device.waitForFences(vkxc.CommandBufferFences[fif_i], VK_TRUE, UINT64_MAX);
+
+        if (Window::IsFramebufferResized())
+            vkx::RecreateSwapchain();
+
+        // acquire swapchain image, and signal SemaphoreImageAcquired[i] when acquired. (when the presentation engine is finished using the image)
+        vkxc.CurrentSwapchainImage =
+            vkx::check(device.acquireNextImageKHR(vkxc.SwapchainKHR, UINT64_MAX, vkxc.SemaphoreImageAcquired[fif_i]));
+
+        device.resetFences(vkxc.CommandBufferFences[fif_i]);  // reset the fence to the unsignaled state
+
+        cmd.reset();
+        cmd.begin(vkx::ICommandBufferBegin(vk::CommandBufferUsageFlagBits::eSimultaneousUse));  // may BUG
     }
 
-    World* world = Ethertia::getWorld();
-    if (world)
+
+    cmd.beginRenderPass(
+        vkx::IRenderPassBegin(
+            vkxc.MainRenderPass,
+            vkxc.SwapchainFramebuffers[vkxc.CurrentSwapchainImage],
+            vkxc.SwapchainExtent,
+            {
+                vkx::ClearValueColor(0, 0, 1, 1),
+                vkx::ClearValueDepthStencil(1, 0)
+            }),
+        vk::SubpassContents::eInline);
+
+    //cmd.CmdSetViewport(vkx::ctx().SwapchainExtent);
+    //cmd.CmdSetScissor(vkx::ctx().SwapchainExtent);
+
+    ImGui::ShowDemoWindow();
+
+    Imgui::Render(cmd);
+
+    cmd.endRenderPass();
+
     {
+        cmd.end();
+
+        // Submit the CommandBuffer.
+        // Submission is VerySlow. try Batch Submit as much as possible, and Submit in another Thread
+        vkx::QueueSubmit(vkxc.GraphicsQueue, cmd,
+            vkxc.SemaphoreImageAcquired[fif_i], { vk::PipelineStageFlagBits::eColorAttachmentOutput },
+            vkxc.SemaphoreRenderComplete[fif_i],
+            vkxc.CommandBufferFences[fif_i]);
+
+
+        if (vkx::QueuePresentKHR(vkxc.PresentQueue, vkxc.SemaphoreRenderComplete[fif_i], vkxc.SwapchainKHR, vkxc.CurrentSwapchainImage) == vk::Result::eSuboptimalKHR)
         {
-            PROFILE("CmdWorldGbuffer");
-            RendererGbuffer::RecordCommands(cmdbuf, world->m_Entities);
+            vkx::RecreateSwapchain();
+            Log::info("Recreate Swapchain cause Resized");
         }
-        {
-            PROFILE("CmdWorldCompose");
-            RendererCompose::RecordCommands(cmdbuf);
-        }
+        //    vkQueueWaitIdle(vkx::ctx().PresentQueue);  // BigWaste on GPU.
+
+        vkxc.CurrentInflightFrame = (vkxc.CurrentInflightFrame + 1) % vkxc.InflightFrames;
     }
-
-    vkx::BeginMainRenderPass(cmdbuf);
-    {
-        PROFILE("GUI");
-
-        Imgui::RenderGUI(cmdbuf);
-    }
-    vkx::EndMainRenderPass(cmdbuf);
-
-    PROFILE("EndFrame");
-    vkx::EndFrame(cmdbuf);
 }
 
 

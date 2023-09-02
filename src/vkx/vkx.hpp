@@ -9,10 +9,14 @@
 #define vkx_slice_t vk::ArrayProxy
 #define vkx_optional_t vk::Optional
 
+#define VKX_CTX_device vk::Device& device = vkx::ctx().Device;
+#define VKX_CTX_device_allocator const vk::Device& device = vkx::ctx().Device; \
+    const vk::AllocationCallbacks* allocator = vkx::ctx().Allocator; \
+    auto& vkxc = vkx::ctx();
+
 #define VKX_BACKEND_eGLFW 1
 #define VKX_BACKEND VKX_BACKEND_eGLFW
 
-#define VKX_CTX_device vk::Device& device = vkx::ctx().Device;
 
 #include <functional>
 #include <iostream>   // for default DebugMessengerCallback impl.
@@ -128,6 +132,10 @@ namespace vkx
 					std::cerr << "VkDebugMessenger[" << sSERV << "][" << sTYPE << "]: " << pCallbackData->pMessage << "\n";
 					std::cerr <<   "===============================================================\n\n";
 					std::cerr.flush();
+					if (messageSeverity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError)
+					{
+						throw 4;
+					}
 				}
 			};
 	};
@@ -145,7 +153,7 @@ namespace vkx
 	void Destroy();
 
 
-	void RecreateSwapchain(bool onlyCreate = false);
+	void RecreateSwapchain(bool destroy = true, bool create = true);
 
 	#pragma endregion
 

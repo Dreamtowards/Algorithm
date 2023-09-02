@@ -42,6 +42,7 @@ add_executable(Ethertia
     src/ethertia/util/BenchmarkTimer.cpp
     src/ethertia/util/Loader.cpp
     src/ethertia/render/Window.cpp
+    src/ethertia/render/RenderEngine.cpp
     src/ethertia/Ethertia.cpp)
 
 

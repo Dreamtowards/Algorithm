@@ -5,12 +5,12 @@
 #include <vkx/vkx.hpp>
 
 #include <ethertia/render/Window.h>
+#include <ethertia/render/RenderEngine.h>
 #include <ethertia/init/Settings.h>
 #include <ethertia/imgui/Imgui.h>
 #include <ethertia/util/BenchmarkTimer.h>
 #include <ethertia/util/Log.h>
 #include <ethertia/util/Loader.h>/*
-#include <ethertia/render/RenderEngine.h>
 #include <ethertia/world/World.h>
 #include <ethertia/util/Loader.h>
 #include <ethertia/util/Timer.h>
@@ -65,10 +65,7 @@ int main(int argc, char** argv, char** envp)
 //static HitCursor    g_HitCursor;
 //static Profiler     g_Profiler;
 //static Camera       g_Camera;
-static vk::Pipeline g_Pipeline;
-static vk::PipelineLayout g_PipelineLayout;
 
-#include <thread>
 
 static void Init()
 {
@@ -86,34 +83,12 @@ static void Init()
     Ethertia::IsRunning() = true;
 
     Window::Init(Settings::DisplaySize.x, Settings::DisplaySize.y, "Version");// Ethertia::Version::name().c_str());
-    //RenderEngine::init();
+    
+    RenderEngine::Init();
     //AudioEngine::init();
     //NetworkSystem::init();
 
-    vkx::Init(Window::Handle(), true);
 
-    uint32_t vkApiVersion = vkx::ctx().PhysDeviceProperties.apiVersion;
-    Log::info("vulkan {}.{}.{}, {}",
-        VK_API_VERSION_MAJOR(vkApiVersion), VK_API_VERSION_MINOR(vkApiVersion), VK_API_VERSION_PATCH(vkApiVersion),
-        (const char*)vkx::ctx().PhysDeviceProperties.deviceName);
-
-    Imgui::Init();
-
-
-    g_PipelineLayout = vkx::CreatePipelineLayout({});
-   
-    g_Pipeline = vkx::CreateGraphicsPipeline(
-       //Loader::LoadShaders("./shaders/test/{}.spv"),  // data free. !DataBlock dtor called.
-       {
-           {Loader::LoadFile("./shaders/test/vert.spv"), vk::ShaderStageFlagBits::eVertex},
-           {Loader::LoadFile("./shaders/test/frag.spv"), vk::ShaderStageFlagBits::eFragment}
-       },
-       {
-           //vk::Format::eR32G32B32Sfloat
-       },
-       g_PipelineLayout,
-       {},
-       vkx::ctx().MainRenderPass);
    
 //    // Materials & Items
 //    MaterialMeshes::load();
@@ -167,9 +142,8 @@ static void Destroy()
 
     //NetworkSystem::deinit();
 
-    Imgui::Destroy();
 
-    //RenderEngine::deinit();
+    RenderEngine::Destroy();
     //AudioEngine::deinit();
 
     Window::Destroy();
@@ -181,69 +155,9 @@ static void RunMainLoop()
     if (Window::IsCloseRequested())
         Ethertia::Shutdown();
 
-    Imgui::NewFrame();
+    
 
-    VKX_CTX_device;
-    auto& vkxc = vkx::ctx();
-
-    int fif_i = vkxc.CurrentInflightFrame;
-    vk::CommandBuffer cmd = vkxc.CommandBuffers[fif_i];
-
-    {
-        // blocking until the CommandBuffer has finished executing
-        device.waitForFences(vkxc.CommandBufferFences[fif_i], VK_TRUE, UINT64_MAX);
-
-        // acquire swapchain image, and signal SemaphoreImageAcquired[i] when acquired. (when the presentation engine is finished using the image)
-        vkxc.CurrentSwapchainImage =
-            vkx::check(device.acquireNextImageKHR(vkxc.SwapchainKHR, UINT64_MAX, vkxc.SemaphoreImageAcquired[fif_i]));
-
-        device.resetFences(vkxc.CommandBufferFences[fif_i]);  // reset the fence to the unsignaled state
-
-        cmd.reset();
-        cmd.begin(vkx::ICommandBufferBegin(vk::CommandBufferUsageFlagBits::eSimultaneousUse));  // may BUG
-    }
-
-
-    cmd.beginRenderPass(
-        vkx::IRenderPassBegin(
-            vkxc.MainRenderPass,
-            vkxc.SwapchainFramebuffers[vkxc.CurrentSwapchainImage],
-            vkxc.SwapchainExtent,
-            {
-                vkx::ClearValueColor(0, 0, 1, 1),
-                vkx::ClearValueDepthStencil(1, 0)
-            }),
-        vk::SubpassContents::eInline);
-
-    //cmd.CmdSetViewport(vkx::ctx().SwapchainExtent);
-    //cmd.CmdSetScissor(vkx::ctx().SwapchainExtent);
-
-    ImGui::ShowDemoWindow();
-
-    Imgui::Render(cmd);
-
-    cmd.endRenderPass();
-
-    {
-        cmd.end();
-
-        // Submit the CommandBuffer.
-        // Submission is VerySlow. try Batch Submit as much as possible, and Submit in another Thread
-        vkx::QueueSubmit(vkxc.GraphicsQueue, cmd,
-            vkxc.SemaphoreImageAcquired[fif_i], { vk::PipelineStageFlagBits::eColorAttachmentOutput },
-            vkxc.SemaphoreRenderComplete[fif_i],
-            vkxc.CommandBufferFences[fif_i]);
-
-
-        if (vkx::QueuePresentKHR(vkxc.PresentQueue, vkxc.SemaphoreRenderComplete[fif_i], vkxc.SwapchainKHR, vkxc.CurrentSwapchainImage) == vk::Result::eSuboptimalKHR)
-        {
-            vkx::RecreateSwapchain();
-            Log::info("Recreate Swapchain cause Resized");
-        }
-        //    vkQueueWaitIdle(vkx::ctx().PresentQueue);  // BigWaste on GPU.
-
-        vkxc.CurrentInflightFrame = (vkxc.CurrentInflightFrame + 1) % vkxc.InflightFrames;
-    }
+    RenderEngine::Render();
 
     Window::PollEvents();
 }

@@ -126,7 +126,7 @@ namespace RendererGbuffer
                          {Loader::loadAssets("shaders-vk/spv/def_gbuffer/frag.spv"), VK_SHADER_STAGE_FRAGMENT_BIT},
                          {Loader::loadAssets("shaders-vk/spv/def_gbuffer/tesc.spv"), VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT},
                          {Loader::loadAssets("shaders-vk/spv/def_gbuffer/tese.spv"), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT}
-                 }},
+                }},
                 {
                         VK_FORMAT_R32G32B32_SFLOAT,
                         VK_FORMAT_R32G32_SFLOAT,
