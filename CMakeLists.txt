@@ -7,6 +7,7 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
+
 set(CMAKE_CXX_STANDARD 20)
 
 set(LIB_DIR "${CMAKE_SOURCE_DIR}/lib")
@@ -17,20 +18,29 @@ project(Ethertia)
 include_directories(src)
 
 include_directories(lib/glfw-3.3.8/include)
-
+include_directories(lib/imgui-docking-1.89.9)
 include_directories(lib/openal-soft/include)
 
 include_directories(lib/glm-0.9.9.8)
 include_directories(lib/fastnoise2-0.10.0a/include)
-
 include_directories(lib/tinyobjloader-1.0.6/include)
 include_directories(lib/json11-1.0.0/include)
 
 
 add_executable(Ethertia
     src/vkx/vkx.cpp
+    
+    lib/imgui-docking-1.89.9/imgui.cpp
+    lib/imgui-docking-1.89.9/imgui_draw.cpp
+    lib/imgui-docking-1.89.9/imgui_widgets.cpp
+    lib/imgui-docking-1.89.9/imgui_tables.cpp
+    lib/imgui-docking-1.89.9/imgui_demo.cpp
+    lib/imgui-docking-1.89.9/backends/imgui_impl_glfw.cpp
+    lib/imgui-docking-1.89.9/backends/imgui_impl_vulkan.cpp
 
+    src/ethertia/imgui/Imgui.cpp
     src/ethertia/util/BenchmarkTimer.cpp
+    src/ethertia/util/Loader.cpp
     src/ethertia/render/Window.cpp
     src/ethertia/Ethertia.cpp)
 
@@ -46,3 +56,6 @@ target_link_directories(Ethertia PRIVATE
     
 target_link_libraries(Ethertia 
     "vulkan-1")
+
+    
+set_target_properties(Ethertia PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:Ethertia>")

@@ -279,4 +279,38 @@ namespace vkx
 	#pragma endregion
 
 
+#pragma region Graphics Pipeline
+
+
+	vk::PipelineColorBlendAttachmentState IPipelineColorBlendAttachment(
+		bool blendEnable = true,
+		vk::BlendFactor srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+		vk::BlendFactor dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+		vk::BlendOp colorBlendOp = vk::BlendOp::eAdd,
+		vk::BlendFactor srcAlphaBlendFactor = vk::BlendFactor::eOne,
+		vk::BlendFactor dstAlphaBlendFactor = vk::BlendFactor::eZero,
+		vk::BlendOp alphaBlendOp = vk::BlendOp::eAdd,
+		vk::ColorComponentFlags colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+
+
+	struct FnArg_CreateGraphicsPipeline
+	{
+		vk::PrimitiveTopology topology = vk::PrimitiveTopology::eTriangleList;
+		std::vector<vk::DynamicState> dynamicStates = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
+	};
+
+	vk::Pipeline CreateGraphicsPipeline(
+		vkx_slice_t<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> shaderStageSources,
+		std::initializer_list<vk::Format> vertexInputAttribFormats,
+		vk::PipelineLayout pipelineLayout,
+		FnArg_CreateGraphicsPipeline args = {},
+		vk::RenderPass renderPass = {},
+		uint32_t subpass = 0);
+
+	vk::PipelineLayout CreatePipelineLayout(
+		vkx_slice_t<vk::DescriptorSetLayout> setLayouts,
+		vkx_slice_t<vk::PushConstantRange> pushConstantRanges = {});
+
+#pragma endregion
+
 }

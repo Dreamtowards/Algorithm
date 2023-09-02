@@ -2,27 +2,15 @@
 // Created by Dreamtowards on 2022/3/30.
 //
 
-#ifndef ETHERTIA_LOADER_H
-#define ETHERTIA_LOADER_H
+#pragma once
 
-#include <initializer_list>
-#include <utility>
-#include <fstream>
-#include <array>
-#include <filesystem>
-#include <span>
-#include <complex>
 #include <span>
 
-#include <ethertia/render/VertexData.h>
-#include <ethertia/util/BitmapImage.h>
-#include <ethertia/audio/AudioEngine.h>
+#include <vkx/vkx.hpp>
 
-#include <vkx.h>
+//#include <ethertia/render/VertexData.h>
+//#include <ethertia/util/BitmapImage.h>
 
-
-// Dup with GuiCommon.h
-#define DECL_Inst(T) static T* Inst() { static T* INST = new T(); return INST; }
 
 
 class Loader
@@ -50,28 +38,27 @@ public:
 
 
     // load entire file.
-    static DataBlock loadFile(const std::string& filename);
+    static DataBlock LoadFile(const std::string& filename);
 
+    static std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> LoadShaders(std::string_view fmt);
+
+    /*
     // locate a real filename of an assets-path.
     // return empty string if cannot locate the assets file.
-    static std::string fileAssets(const std::string& p);
+    // if path str leading with './', '/', 'C:/', then just locate actual-path instead of asset-path
+    static std::string FindAsset(const std::string& p);
 
     // a quick utility func of `loadFile(fileAssets(p));`
-    static DataBlock loadAssets(const std::string& p);
-
-    // experimental.
-    // locate a real filename of: an actual-path leading with './', '/', 'C:/' OR an assets-path
-    static std::string fileResolve(const std::string& p);
+    static DataBlock LoadAsset(const std::string& p);
 
 
-    static bool fileExists(const std::filesystem::path& path);
+    static bool FileExists(const std::filesystem::path& path);
 
     // mkdirs for the "dir/" or a file's parent dir "dir/somefile"
-    static const std::string& fileMkdirs(const std::string& filename);
+    static const std::string& Mkdirs(const std::string& filename);
 
     // !Heavy IO Cost. recursive calc all file size.
-    static size_t dirSize(const std::string& dir);
-
+    static size_t FileSize(const std::string& dir);
 
 
 
@@ -261,7 +248,6 @@ public:
 
 
     static std::vector<std::complex<float>> fft_1d(const std::vector<std::complex<float>>& data);
-
+    */
 };
 
-#endif //ETHERTIA_LOADER_H

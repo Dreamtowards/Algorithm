@@ -6,8 +6,10 @@
 
 #include <ethertia/render/Window.h>
 #include <ethertia/init/Settings.h>
+#include <ethertia/imgui/Imgui.h>
 #include <ethertia/util/BenchmarkTimer.h>
-#include <ethertia/util/Log.h>/*
+#include <ethertia/util/Log.h>
+#include <ethertia/util/Loader.h>/*
 #include <ethertia/render/RenderEngine.h>
 #include <ethertia/world/World.h>
 #include <ethertia/util/Loader.h>
@@ -63,7 +65,10 @@ int main(int argc, char** argv, char** envp)
 //static HitCursor    g_HitCursor;
 //static Profiler     g_Profiler;
 //static Camera       g_Camera;
+static vk::Pipeline g_Pipeline;
+static vk::PipelineLayout g_PipelineLayout;
 
+#include <thread>
 
 static void Init()
 {
@@ -77,7 +82,6 @@ static void Init()
     //    ModLoader::loadMod(modpath);
     //}
     //OpenVR::init();
-
 
     Ethertia::IsRunning() = true;
 
@@ -93,8 +97,24 @@ static void Init()
         VK_API_VERSION_MAJOR(vkApiVersion), VK_API_VERSION_MINOR(vkApiVersion), VK_API_VERSION_PATCH(vkApiVersion),
         (const char*)vkx::ctx().PhysDeviceProperties.deviceName);
 
+    Imgui::Init();
 
 
+    g_PipelineLayout = vkx::CreatePipelineLayout({});
+   
+    g_Pipeline = vkx::CreateGraphicsPipeline(
+       //Loader::LoadShaders("./shaders/test/{}.spv"),  // data free. !DataBlock dtor called.
+       {
+           {Loader::LoadFile("./shaders/test/vert.spv"), vk::ShaderStageFlagBits::eVertex},
+           {Loader::LoadFile("./shaders/test/frag.spv"), vk::ShaderStageFlagBits::eFragment}
+       },
+       {
+           //vk::Format::eR32G32B32Sfloat
+       },
+       g_PipelineLayout,
+       {},
+       vkx::ctx().MainRenderPass);
+   
 //    // Materials & Items
 //    MaterialMeshes::load();
 //    ItemTextures::load();
@@ -147,7 +167,7 @@ static void Destroy()
 
     //NetworkSystem::deinit();
 
-    //Imgui::Destroy();
+    Imgui::Destroy();
 
     //RenderEngine::deinit();
     //AudioEngine::deinit();
@@ -160,6 +180,8 @@ static void RunMainLoop()
 {
     if (Window::IsCloseRequested())
         Ethertia::Shutdown();
+
+    Imgui::NewFrame();
 
     VKX_CTX_device;
     auto& vkxc = vkx::ctx();
@@ -195,6 +217,10 @@ static void RunMainLoop()
 
     //cmd.CmdSetViewport(vkx::ctx().SwapchainExtent);
     //cmd.CmdSetScissor(vkx::ctx().SwapchainExtent);
+
+    ImGui::ShowDemoWindow();
+
+    Imgui::Render(cmd);
 
     cmd.endRenderPass();
 

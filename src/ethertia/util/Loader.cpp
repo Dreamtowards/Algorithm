@@ -2,22 +2,54 @@
 // Created by Dreamtowards on 2023/2/1.
 //
 
-#include <glad/glad.h>
-
 #include "Loader.h"
 
-#include <ethertia/util/Strings.h>
+#include <format>
+#include <fstream>
+
+#include <ethertia/util/Log.h>
 
 
-// #define DATA_INFO 1
+#define ET_LOADER_LOADINFO 1
 
-
-
-Loader::DataBlock Loader::loadFile(const std::string& path)
+Loader::DataBlock::DataBlock(void* data, size_t size, const std::string& filename)
+    : m_Data(data), m_Size(size), m_Filename(filename)
 {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
+#ifdef ET_LOADER_LOADINFO
+    Log::info("New DataBlock: {} of {} bytes", m_Filename, size);
+#endif
+}
+
+Loader::DataBlock::~DataBlock()
+{
+    std::free(m_Data);
+#ifdef ET_LOADER_LOADINFO
+    Log::info("Delete DataBlock: {}", m_Filename);
+#endif
+}
+
+const void* Loader::DataBlock::data() const {
+    return m_Data;
+}
+size_t Loader::DataBlock::size() const {
+    return m_Size;
+}
+
+Loader::DataBlock::operator std::span<const char>() const
+{
+    return std::span<const char>((const char*)data(), (int)size());
+}
+
+
+
+
+
+
+Loader::DataBlock Loader::LoadFile(const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
-        throw std::runtime_error(Strings::fmt("Failed to open file: ", path));
+        throw std::runtime_error(std::format("Failed to open file: ", filename));
     }
     size_t filesize = (size_t)file.tellg();
     char* data = new char[filesize + 1];  // +1: add an extra '\0' at the end. for c_string format compatible.
@@ -27,9 +59,19 @@ Loader::DataBlock Loader::loadFile(const std::string& path)
     file.read(data, filesize);
     file.close();
 
-    return Loader::DataBlock(data, filesize, path);
+    return Loader::DataBlock(data, filesize, filename);
 }
 
+
+std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> Loader::LoadShaders(
+    std::string_view fmt)
+{
+    std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> ls;
+    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("vert"))), vk::ShaderStageFlagBits::eVertex});
+    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("frag"))), vk::ShaderStageFlagBits::eFragment});
+    return ls;
+}
+/*
 
 bool Loader::fileExists(const std::filesystem::path& path)
 {
@@ -91,41 +133,6 @@ size_t Loader::dirSize(const std::string& dir)
 
 
 
-
-
-
-
-
-
-
-
-Loader::DataBlock::DataBlock(void* data, size_t size, const std::string& filename)
-        : m_Data(data), m_Size(size), m_Filename(filename)
-{
-#ifdef DATA_INFO
-    Log::info("New DataBlock: {} of {} bytes", m_Filename, size);
-#endif
-}
-
-Loader::DataBlock::~DataBlock()
-{
-    std::free(m_Data);
-#ifdef DATA_INFO
-    Log::info("Delete DataBlock: {}", m_Filename);
-#endif
-}
-
-const void* Loader::DataBlock::data() const {
-    return m_Data;
-}
-size_t Loader::DataBlock::size() const {
-    return m_Size;
-}
-
-Loader::DataBlock::operator std::span<const char>() const
-{
-    return std::span<const char>((const char*)data(), (int)size());
-}
 
 
 
@@ -651,11 +658,11 @@ void Loader::saveWAV(std::ostream& out, const void* pcm, size_t size, int sample
 {
     // endianness problem. may cause wrong on big-endian system.
     struct WAV_HEADER {
-        /* RIFF Chunk Descriptor */
+        // RIFF Chunk Descriptor
         uint8_t RIFF[4] = {'R', 'I', 'F', 'F'}; // RIFF Header Magic header
         uint32_t ChunkSize;                     // RIFF Chunk Size
         uint8_t WAVE[4] = {'W', 'A', 'V', 'E'}; // WAVE Header
-        /* "fmt" sub-chunk */
+        // "fmt" sub-chunk
         uint8_t fmt[4] = {'f', 'm', 't', ' '}; // FMT header
         uint32_t Subchunk1Size = 16;           // Size of the fmt chunk
         uint16_t AudioFormat = 1; // Audio format 1=PCM,6=mulaw,7=alaw,     257=IBM
@@ -665,7 +672,7 @@ void Loader::saveWAV(std::ostream& out, const void* pcm, size_t size, int sample
         uint32_t bytesPerSec = 16000 * 2; // bytes per second
         uint16_t blockAlign = 2;          // 2=16-bit mono, 4=16-bit stereo
         uint16_t bitsPerSample = 16;      // Number of bits per sample
-        /* "data" sub-chunk */
+        // "data" sub-chunk
         uint8_t Subchunk2ID[4] = {'d', 'a', 't', 'a'}; // "data"  string
         uint32_t Subchunk2Size;                        // Sampled data length
     };
@@ -887,3 +894,4 @@ std::vector<std::complex<float>> Loader::fft_1d(const std::vector<std::complex<f
 {
     return dj::fft1d(freq, dj::fft_dir::DIR_FWD);
 }
+*/
