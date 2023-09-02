@@ -6,7 +6,8 @@ cmake-build-release/*
 
 # MSVC
 out/
-.vs/
+.vs/Algorithm/
+.vs/cmake.db
 
 run/bin/macos-x86-64/*
 run/bin/darwin-x64/*
