@@ -39,37 +39,12 @@ std::vector<vk::DescriptorSet> g_DescriptorSets;
 vk::DescriptorSetLayout g_DescriptorSetLayout;
 
 
+vkx::Image* g_Tex;
+
 #define VKX_LIST_CREATE(ls, n, init) ls.resize(n); for (int _i = 0; _i < n; ++_i) { ls[_i] = init; }
 #define VKX_LIST_DELETE(ls) for (int _i = 0; _i < ls.size(); ++_i) { delete ls[_i]; }
 
-vk::WriteDescriptorSet IWriteDescriptorSet(
-    vk::DescriptorSet descriptorSet,
-    uint32_t binding,
-    vk::DescriptorType descriptorType,
-    void* info)
-{
-    vk::WriteDescriptorSet descriptorWrite{};
-    descriptorWrite.dstSet = descriptorSet;
-    descriptorWrite.dstBinding = binding;
-    descriptorWrite.dstArrayElement = 0;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.descriptorType = descriptorType;
 
-    if (descriptorType == vk::DescriptorType::eCombinedImageSampler)
-    {
-        descriptorWrite.pImageInfo = (vk::DescriptorImageInfo*)info;
-    }
-    else if (descriptorType == vk::DescriptorType::eUniformBuffer)
-    {
-        descriptorWrite.pBufferInfo = (vk::DescriptorBufferInfo*)info;
-    }
-    else
-    {
-        //descriptorWrite.pTexelBufferView = nullptr;
-        throw 44;
-    }
-    return descriptorWrite;
-}
 
 void RenderEngine::Init()
 {
@@ -86,9 +61,15 @@ void RenderEngine::Init()
 
     Imgui::Init();
 
+
+    auto img = Loader::LoadPNG_("C:/Dev/Algorithm/run/assets/misc/uvmap.png");
+    g_Tex = vkx::CreateStagedImage(img.width(), img.height(), img.pixels());
+
+
     g_DescriptorSetLayout = vkx::CreateDescriptorSetLayout(
     {
-        {vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex}
+        {vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex},
+        {vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment}
     });
 
     g_PipelineLayout = vkx::CreatePipelineLayout(g_DescriptorSetLayout);
@@ -108,10 +89,10 @@ void RenderEngine::Init()
         vkx::ctx().MainRenderPass, 0);
 
     VertexData vtx;
-    vtx.addVertex({ {-0.5, -0.5, 0}, {}, {} });
-    vtx.addVertex({ { 0.5, -0.5, 0}, {}, {} });
-    vtx.addVertex({ { 0.5,  0.5, 0}, {}, {} });
-    vtx.addVertex({ {-0.5,  0.5, 0}, {}, {} });
+    vtx.addVertex({ {-0.5, -0.5, 0}, {0, 1}, {} });
+    vtx.addVertex({ { 0.5, -0.5, 0}, {1, 1}, {} });
+    vtx.addVertex({ { 0.5,  0.5, 0}, {1, 0}, {} });
+    vtx.addVertex({ {-0.5,  0.5, 0}, {0, 0}, {} });
 
     vtx.Indices.push_back(0);
     vtx.Indices.push_back(1);
@@ -131,15 +112,15 @@ void RenderEngine::Init()
     g_DescriptorSets.resize(vkxc.InflightFrames);
     vkx::AllocateDescriptorSets(vkxc.InflightFrames, g_DescriptorSets.data(), layouts.data());
 
-    for (size_t i = 0; i < vkxc.InflightFrames; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = g_ubos[i]->buffer;
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UBO_A);
-
-        vk::WriteDescriptorSet sets = IWriteDescriptorSet(g_DescriptorSets[i], 0, vk::DescriptorType::eUniformBuffer, &bufferInfo);
-        device.updateDescriptorSets(sets, {});
+    for (size_t i = 0; i < vkxc.InflightFrames; i++) 
+    {
+        vkx::WriteDescriptorSet(g_DescriptorSets[i],
+        {
+            { .buffer = vkx::IDescriptorBuffer(g_ubos[i]) },
+            { .image  = vkx::IDescriptorImage(g_Tex->imageView) }
+        });
     }
+
 
     //TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));
     //TEX_UVMAP = Loader::loadTexture("misc/uvmap.png");
@@ -180,6 +161,7 @@ void RenderEngine::Destroy()
     device.destroyDescriptorSetLayout(g_DescriptorSetLayout, allocator);
 
     delete g_VBuffer;
+    delete g_Tex;
 
     Imgui::Destroy();
 

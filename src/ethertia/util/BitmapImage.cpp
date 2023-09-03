@@ -4,6 +4,12 @@
 
 #include "BitmapImage.h"
 
+#include <assert.h>
+#include <algorithm>
+
+#include <stb_image_resize.h>
+
+
 
 BitmapImage::BitmapImage(int w, int h)
 {
@@ -21,25 +27,25 @@ BitmapImage::BitmapImage(int w, int h, void* pxs)
 
 BitmapImage::~BitmapImage()
 {
-    delete m_Pixels;
+    free(m_Pixels);
 }
 
 
 
-void BitmapImage::resize(const BitmapImage &src, BitmapImage &dst, bool nearestSample)
+void BitmapImage::Resize(const BitmapImage& src, BitmapImage& dst, bool nearestSample)
 {
     assert(nearestSample == false);
-    int succ =
-            stbir_resize_uint8((const unsigned char*)src.m_Pixels, src.width(), src.height(), 0,
-                               (      unsigned char*)dst.m_Pixels, dst.width(), dst.height(), 0, 4);
+    int succ = stbir_resize_uint8((const unsigned char*)src.m_Pixels, src.width(), src.height(), 0,
+                                  (      unsigned char*)dst.m_Pixels, dst.width(), dst.height(), 0, 4);
     assert(succ);
 }
 
 
-void BitmapImage::CopyPixels(int srcX, int srcY, const BitmapImage& srcImg,
-                             int dstX, int dstY, BitmapImage& dstImg,
-                             int cpyWidth, int cpyHeight,
-                             int specChannel)
+void BitmapImage::CopyPixels(
+    int srcX, int srcY, const BitmapImage& srcImg,
+    int dstX, int dstY, BitmapImage& dstImg,
+    int cpyWidth, int cpyHeight,
+    int specChannel)
 {
     if (cpyWidth == -1) cpyWidth = srcImg.width();
     if (cpyHeight == -1) cpyHeight = srcImg.height();
@@ -52,8 +58,8 @@ void BitmapImage::CopyPixels(int srcX, int srcY, const BitmapImage& srcImg,
         {
             if (specChannel != -1) // copy only the channel.
             {
-                dstImg.pixel_(dstX+dx, dstY+dy)[specChannel] =
-                srcImg.pixel_(srcX+dx, srcY+dy)[specChannel];
+                dstImg.pixel_channels(dstX+dx, dstY+dy)[specChannel] =
+                srcImg.pixel_channels(srcX+dx, srcY+dy)[specChannel];
             }
             else
             {
@@ -65,8 +71,30 @@ void BitmapImage::CopyPixels(int srcX, int srcY, const BitmapImage& srcImg,
 }
 
 
+int BitmapImage::width() const {
+    return m_Width;
+}
+int BitmapImage::height() const {
+    return m_Height;
+}
 
-void BitmapImage::fill(std::uint32_t rgba)
+
+uint32_t* BitmapImage::pixels() {
+    return m_Pixels;
+}
+uint32_t* BitmapImage::pixels() const {
+    return m_Pixels;
+}
+
+uint32_t& BitmapImage::pixel(int x, int y) const {
+    return m_Pixels[y * m_Width + x];
+}
+
+char* BitmapImage::pixel_channels(int x, int y) const {
+    return (char*)&pixel(x, y);
+}
+
+void BitmapImage::fill(uint32_t rgba)
 {
     std::fill(m_Pixels, m_Pixels + m_Width*m_Height, rgba);
 }
@@ -77,12 +105,12 @@ void BitmapImage::fillAlpha(float a)
 
     for (int x = 0; x < m_Width; ++x) {
         for (int y = 0; y < m_Height; ++y) {
-            pixel_(x,y)[3] = (char)(a * 255.0f);
+            pixel_channels(x,y)[3] = (char)(a * 255.0f);
         }
     }
 }
 
-void BitmapImage::flipY(std::uint32_t *dst) const
+void BitmapImage::flipY(uint32_t* dst) const
 {
     for (int y = 0; y < m_Height; ++y) {
         uint32_t bas = (m_Height-1-y) * m_Width;

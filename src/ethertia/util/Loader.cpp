@@ -63,14 +63,14 @@ Loader::DataBlock Loader::LoadFile(const std::string& filename)
 }
 
 
-std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> Loader::LoadShaders(
-    std::string_view fmt)
-{
-    std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> ls;
-    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("vert"))), vk::ShaderStageFlagBits::eVertex});
-    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("frag"))), vk::ShaderStageFlagBits::eFragment});
-    return ls;
-}
+//std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> Loader::LoadShaders(
+//    std::string_view fmt)
+//{
+//    std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> ls;
+//    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("vert"))), vk::ShaderStageFlagBits::eVertex});
+//    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("frag"))), vk::ShaderStageFlagBits::eFragment});
+//    return ls;
+//}
 /*
 
 bool Loader::fileExists(const std::filesystem::path& path)
@@ -223,28 +223,30 @@ void Loader::saveOBJ(const std::string& filename, size_t verts, const float* pos
 
 
 
-
+*/
 
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
+#include <stb_image.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb/stb_image_write.h>
+#include <stb_image_write.h>
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include <stb/stb_image_resize.h>
+#include <stb_image_resize.h>
 
 
 
 
-BitmapImage Loader::loadPNG_(const char* filename)
+BitmapImage Loader::LoadPNG_(const char* filename)
 {
     // stbi_set_flip_vertically_on_load(true);
     int w, h, channels;
     void* pixels = stbi_load(filename, &w, &h, &channels, 4);
+    assert(pixels);
 
     return BitmapImage(w, h, pixels);
 }
 
+/*
 //BitmapImage Loader::loadPNG(const void* data, size_t len)
 //{
 //    int w, h, channels;

@@ -9,7 +9,7 @@
 #include <vkx/vkx.hpp>
 
 //#include <ethertia/render/VertexData.h>
-//#include <ethertia/util/BitmapImage.h>
+#include <ethertia/util/BitmapImage.h>
 
 
 
@@ -40,7 +40,7 @@ public:
     // load entire file.
     static DataBlock LoadFile(const std::string& filename);
 
-    static std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> LoadShaders(std::string_view fmt);
+    //static std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> LoadShaders(std::string_view fmt);
 
     /*
     // locate a real filename of an assets-path.
@@ -78,16 +78,17 @@ public:
 
 
 
-
+    */
 
     //////////// PNG ////////////
 
     // todo: return BitmapImage* ptr. for more flexible
 
     // internal. stbi_load(filename). load file directly might optimizer than stbi_load_from_memory.
-    static BitmapImage loadPNG_(const char* filename);
+    static BitmapImage LoadPNG_(const char* filename);
 
-    static BitmapImage loadPNG(const std::string& uri) { return Loader::loadPNG_(Loader::fileResolve(uri).c_str()); }
+    /*
+    static BitmapImage loadPNG(const std::string& uri) { return Loader::loadPNG_(Loader::FindAsset(uri).c_str()); }
 
 
     // stbi_load_from_memory().
@@ -99,7 +100,6 @@ public:
 
 
     static void savePNG(const std::string& filename, const BitmapImage& img);
-
 
 
 

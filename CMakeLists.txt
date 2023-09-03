@@ -22,6 +22,7 @@ include_directories(lib/imgui-docking-1.89.9)
 include_directories(lib/openal-soft/include)
 
 include_directories(lib/glm-0.9.9.8)
+include_directories(lib/stb)
 include_directories(lib/fastnoise2-0.10.0a/include)
 include_directories(lib/tinyobjloader-1.0.6/include)
 include_directories(lib/json11-1.0.0/include)
@@ -41,6 +42,7 @@ add_executable(Ethertia
     src/ethertia/imgui/Imgui.cpp
     src/ethertia/util/BenchmarkTimer.cpp
     src/ethertia/util/Loader.cpp
+    src/ethertia/util/BitmapImage.cpp
     src/ethertia/render/Window.cpp
     src/ethertia/render/RenderEngine.cpp
     src/ethertia/render/VertexData.cpp

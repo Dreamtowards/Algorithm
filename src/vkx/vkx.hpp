@@ -59,9 +59,10 @@ namespace vkx
 		int height;
 
 
-		Image(vk::Image image = {}, vk::DeviceMemory imageMemory = {}, vk::Format format = {}, int width = 0, int height = 0, vk::ImageView imageView = {}) :
-			image(image), imageMemory(imageMemory), format(format), width(width), height(height), imageView(imageView) {}
+		Image(vk::Image image = {}, vk::DeviceMemory imageMemory = {},
+			vk::Format format = {}, int width = 0, int height = 0, vk::ImageView imageView = {});
 
+		~Image();
 	};
 
 	struct QueueFamilyIndices
@@ -98,7 +99,7 @@ namespace vkx
 		std::vector<vk::Image>		SwapchainImages;
 		std::vector<vk::ImageView>	SwapchainImageViews;
 		std::vector<vk::Framebuffer>SwapchainFramebuffers;
-		vkx::Image 					SwapchainDepthImage;
+		vkx::Image*					SwapchainDepthImage;
 		vk::SurfaceFormatKHR		SwapchainSurfaceFormat;  // dependnt by CreateSwapchain and CreateMainRenderPass
 		vk::Format 					SwapchainDepthImageFormat;
 
@@ -303,17 +304,16 @@ namespace vkx
 
 	#pragma region Image, ImageView.
 
-	void CreateImage(
+	vk::Image CreateImage(
 		int width, int height,
-		vk::Image* pImage,  // out
-		vk::DeviceMemory* pImageMemory,  // out
+		vk::DeviceMemory& out_ImageMemory,  // out
 		vk::Format format = vk::Format::eB8G8R8A8Unorm,  // ?UNorm SRGB
 		vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
 		vk::MemoryPropertyFlags memProperties = vk::MemoryPropertyFlagBits::eDeviceLocal,
 		vk::ImageTiling tiling = vk::ImageTiling::eOptimal,
 		bool creatingCubeMap = false);
 
-	vkx::Image CreateDepthImage(int width, int height);
+	vkx::Image* CreateDepthImage(int width, int height);
 
 	vk::ImageView CreateImageView(
 		vk::Image image,
@@ -325,6 +325,10 @@ namespace vkx
 		vk::Filter magFilter = vk::Filter::eNearest,
 		vk::Filter minFilter = vk::Filter::eNearest,
 		vk::SamplerAddressMode addressModeUVW = vk::SamplerAddressMode::eRepeat);
+
+
+	vkx::Image* CreateStagedImage(
+		uint32_t width, uint32_t height, void* pixels);
 
 	#pragma endregion
 
@@ -419,18 +423,6 @@ namespace vkx
 	};
 
 
-
-	vk::DescriptorSetLayout CreateDescriptorSetLayout(
-		vkx_slice_t<std::pair<vk::DescriptorType, vk::ShaderStageFlags>> bindings, 
-		uint32_t firstBinding = 0);
-
-
-	void AllocateDescriptorSets(
-		uint32_t descriptorSetCount,
-		vk::DescriptorSet* out_DescriptorSets,
-		vk::DescriptorSetLayout* descriptorSetLayouts);
-
-
 	class UniformBuffer
 	{
 	public:
@@ -447,6 +439,39 @@ namespace vkx
 	};
 
 	vkx::UniformBuffer* CreateUniformBuffer(vk::DeviceSize size);
+
+
+
+
+	vk::DescriptorSetLayout CreateDescriptorSetLayout(
+		vkx_slice_t<std::pair<vk::DescriptorType, vk::ShaderStageFlags>> bindings, 
+		uint32_t firstBinding = 0);
+
+
+	void AllocateDescriptorSets(
+		uint32_t descriptorSetCount,
+		vk::DescriptorSet* out_DescriptorSets,
+		vk::DescriptorSetLayout* descriptorSetLayouts);
+
+
+
+
+	vk::DescriptorBufferInfo IDescriptorBuffer(const vkx::UniformBuffer* ub);
+
+	vk::DescriptorImageInfo IDescriptorImage(vk::ImageView imageView);
+
+	struct FnArg_WriteDescriptor
+	{
+		vk::DescriptorBufferInfo buffer{};
+		vk::DescriptorImageInfo  image{};
+	};
+
+	void WriteDescriptorSet(
+		vk::DescriptorSet descriptorSet,
+		std::initializer_list<FnArg_WriteDescriptor> writeDescriptors,
+		uint32_t firstBinding = 0);
+
+
 
 	#pragma endregion
 

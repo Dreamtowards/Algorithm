@@ -111,7 +111,7 @@ vk::Buffer vkx::CreateBuffer(
 
 void vkx::CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size)
 {
-    vkx::SubmitCommandBuffer([=](vk::CommandBuffer cmdbuf)
+    vkx::SubmitCommandBuffer([&](vk::CommandBuffer cmdbuf)
     {
         vk::BufferCopy copyRegion{};
         copyRegion.size = size;
@@ -200,11 +200,10 @@ vkx::VertexBuffer* vkx::LoadVertexBuffer(
 
 #pragma region Image, ImageView. ImageSampler.
 
-void vkx::CreateImage(
+vk::Image vkx::CreateImage(
     int width,
     int height, 
-    vk::Image* pImage,
-    vk::DeviceMemory* pImageMemory,
+    vk::DeviceMemory& out_ImageMemory,
     vk::Format format,
     vk::ImageUsageFlags usage,
     vk::MemoryPropertyFlags memProperties,
@@ -232,13 +231,14 @@ void vkx::CreateImage(
         imageInfo.flags |= vk::ImageCreateFlagBits::eCubeCompatible;
     }
 
-    *pImage = device.createImage(imageInfo, allocator);
+    vk::Image image = device.createImage(imageInfo, allocator);
 
-    vk::MemoryRequirements memRequirements = device.getImageMemoryRequirements(*pImage);
+    vk::MemoryRequirements memRequirements = device.getImageMemoryRequirements(image);
+    out_ImageMemory = vkx::AllocateMemory(memRequirements, memProperties);
 
-    *pImageMemory = vkx::AllocateMemory(memRequirements, memProperties);
+    device.bindImageMemory(image, out_ImageMemory, 0);
 
-    device.bindImageMemory(*pImage, *pImageMemory, 0);
+    return image;
 }
 
 vk::ImageView vkx::CreateImageView(
@@ -284,6 +284,7 @@ vk::Sampler vkx::CreateImageSampler(
 
     samplerInfo.anisotropyEnable = VK_TRUE;
     samplerInfo.maxAnisotropy = gpuProperties.limits.maxSamplerAnisotropy;
+    std::cout << "GPU maxSamplerAnisotropy " << gpuProperties.limits.maxSamplerAnisotropy << "\n";
 
     samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
@@ -394,13 +395,24 @@ static vk::Format _FindDepthFormat() {
 }
 
 
-vkx::Image vkx::CreateDepthImage(int width, int height)
+vkx::Image::Image(vk::Image image, vk::DeviceMemory imageMemory, vk::Format format, int width, int height, vk::ImageView imageView) :
+    image(image), imageMemory(imageMemory), format(format), width(width), height(height), imageView(imageView) {}
+
+vkx::Image::~Image()
+{
+    VKX_CTX_device_allocator;
+    device.destroyImage(image, allocator);
+    device.freeMemory(imageMemory, allocator);
+    device.destroyImageView(imageView, allocator);
+}
+
+
+vkx::Image* vkx::CreateDepthImage(int width, int height)
 {
     vk::Format depthFormat = _FindDepthFormat();
 
-    vk::Image image;
     vk::DeviceMemory imageMemory;
-    vkx::CreateImage(width, height, &image, &imageMemory,
+    vk::Image image = vkx::CreateImage(width, height, imageMemory,
         depthFormat, vk::ImageUsageFlagBits::eDepthStencilAttachment);
 
     vk::ImageView imageView = vkx::CreateImageView(image, depthFormat, vk::ImageAspectFlagBits::eDepth);
@@ -408,8 +420,72 @@ vkx::Image vkx::CreateDepthImage(int width, int height)
     _TransitionImageLayout(image, depthFormat,
         vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-    return vkx::Image(image, imageMemory, depthFormat, width, height, imageView);
+    return new vkx::Image(image, imageMemory, depthFormat, width, height, imageView);
 }
+
+
+static void _CopyBufferToImage(
+    vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height,
+    int regionCount = 1, int regionOffsetSize = 0)  // for CubeMaps
+{
+    vkx::SubmitCommandBuffer([&](vk::CommandBuffer cmd)
+    {
+        std::vector<vk::BufferImageCopy> regions(regionCount);
+        uint32_t offset = 0;
+        for (int i = 0; i < regionCount; ++i) {
+            vk::BufferImageCopy& region = regions[i] = {};
+            region.bufferOffset = offset;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
+            region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+            region.imageSubresource.mipLevel = 0;
+            region.imageSubresource.baseArrayLayer = i;  // face_i
+            region.imageSubresource.layerCount = 1;
+            region.imageOffset = { 0, 0, 0 };
+            region.imageExtent = { width, height, 1 };
+            offset += regionOffsetSize;
+        }
+
+        cmd.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, regions);
+    });
+}
+
+vkx::Image* vkx::CreateStagedImage(
+    uint32_t width, uint32_t height, void* pixels)
+{
+    VKX_CTX_device_allocator;
+    vk::DeviceSize imageSize = width * height * 4;
+    vk::Format format = vk::Format::eR8G8B8A8Unorm;
+
+    vk::DeviceMemory stagingBufferMemory;
+    vk::Buffer stagingBuffer = vkx::CreateBuffer(imageSize, stagingBufferMemory,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+    void* mapped = vkx::MapMemory(stagingBufferMemory, imageSize);
+    std::memcpy(mapped, pixels, imageSize);
+    vkx::UnmapMemory(stagingBufferMemory);
+
+    vk::DeviceMemory imageMemory;
+    vk::Image image = vkx::CreateImage(width, height, imageMemory, format, 
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
+
+    _TransitionImageLayout(image, format,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+
+    _CopyBufferToImage(stagingBuffer, image, width, height);
+
+    _TransitionImageLayout(image, format, 
+        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+    device.destroyBuffer(stagingBuffer, allocator);
+    device.freeMemory(stagingBufferMemory, allocator);
+
+    vk::ImageView imageView = vkx::CreateImageView(image, format);
+
+    return new vkx::Image(image, imageMemory, format, width, height, imageView);
+}
+
 
 #pragma endregion
 
@@ -910,8 +986,6 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     return pipeline;
 }
 
-
-
 vk::PipelineLayout vkx::CreatePipelineLayout(
     vkx_slice_t<vk::DescriptorSetLayout> setLayouts,
     vkx_slice_t<vk::PushConstantRange> pushConstantRanges)
@@ -927,46 +1001,6 @@ vk::PipelineLayout vkx::CreatePipelineLayout(
     return device.createPipelineLayout(layoutInfo, allocator);
 }
 
-vk::DescriptorSetLayout vkx::CreateDescriptorSetLayout(
-    vkx_slice_t<std::pair<vk::DescriptorType, vk::ShaderStageFlags>> _bindings, uint32_t firstBinding)
-{
-    VKX_CTX_device_allocator;
-
-    std::vector<vk::DescriptorSetLayoutBinding> ls{ _bindings.size() };
-    uint32_t i = firstBinding;
-    for (auto& it : _bindings) {
-        ls[i] = vk::DescriptorSetLayoutBinding{
-            .binding = i,
-            .descriptorType = it.first,
-            .descriptorCount = 1,
-            .stageFlags = it.second,
-            .pImmutableSamplers = nullptr
-        };
-        ++i;
-    }
-
-    vk::DescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.bindingCount = ls.size();
-    layoutInfo.pBindings = ls.data();
-
-    return device.createDescriptorSetLayout(layoutInfo, allocator);
-}
-
-
-void vkx::AllocateDescriptorSets(
-    uint32_t descriptorSetCount,
-    vk::DescriptorSet* out_DescriptorSets, 
-    vk::DescriptorSetLayout* descriptorSetLayouts)
-{
-    VKX_CTX_device_allocator;
-
-    vk::DescriptorSetAllocateInfo allocInfo{};
-    allocInfo.descriptorPool = vkxc.DescriptorPool;
-    allocInfo.descriptorSetCount = descriptorSetCount;
-    allocInfo.pSetLayouts = descriptorSetLayouts;
-
-    VKX_CHECK(device.allocateDescriptorSets(&allocInfo, out_DescriptorSets));
-}
 
 
 vkx::UniformBuffer::UniformBuffer(vk::Buffer buf, vk::DeviceMemory mem, void* p, size_t n)
@@ -994,6 +1028,115 @@ vkx::UniformBuffer* vkx::CreateUniformBuffer(vk::DeviceSize size)
     void* mapped = vkx::MapMemory(mem, size);
 
     return new vkx::UniformBuffer(buffer, mem, mapped, size);
+}
+
+
+
+
+
+
+vk::DescriptorSetLayout vkx::CreateDescriptorSetLayout(
+    vkx_slice_t<std::pair<vk::DescriptorType, vk::ShaderStageFlags>> bindings, uint32_t firstBinding)
+{
+    VKX_CTX_device_allocator;
+
+    std::vector<vk::DescriptorSetLayoutBinding> ls;
+    ls.reserve(bindings.size());
+
+    uint32_t bindingIdx = firstBinding;
+    for (auto& it : bindings) {
+        ls.push_back(vk::DescriptorSetLayoutBinding{
+            .binding = bindingIdx,
+            .descriptorType = it.first,
+            .descriptorCount = 1,
+            .stageFlags = it.second,
+            .pImmutableSamplers = nullptr
+        });
+        ++bindingIdx;
+    }
+
+    vk::DescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.bindingCount = ls.size();
+    layoutInfo.pBindings = ls.data();
+
+    return device.createDescriptorSetLayout(layoutInfo, allocator);
+}
+
+
+void vkx::AllocateDescriptorSets(
+    uint32_t descriptorSetCount,
+    vk::DescriptorSet* out_DescriptorSets, 
+    vk::DescriptorSetLayout* descriptorSetLayouts)
+{
+    VKX_CTX_device_allocator;
+
+    vk::DescriptorSetAllocateInfo allocInfo{};
+    allocInfo.descriptorPool = vkxc.DescriptorPool;
+    allocInfo.descriptorSetCount = descriptorSetCount;
+    allocInfo.pSetLayouts = descriptorSetLayouts;
+
+    VKX_CHECK(device.allocateDescriptorSets(&allocInfo, out_DescriptorSets));
+}
+
+
+
+vk::DescriptorBufferInfo vkx::IDescriptorBuffer(const vkx::UniformBuffer* ub)
+{
+    vk::DescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = ub->buffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = ub->size;
+    return bufferInfo;
+}
+
+vk::DescriptorImageInfo vkx::IDescriptorImage(vk::ImageView imageView)
+{
+    VKX_CTX_device_allocator;
+    vk::DescriptorImageInfo imageInfo{};
+    imageInfo.sampler = vkxc.ImageSampler;
+    imageInfo.imageView = imageView;
+    imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    return imageInfo;
+}
+
+
+void vkx::WriteDescriptorSet(
+    vk::DescriptorSet descriptorSet, 
+    std::initializer_list<vkx::FnArg_WriteDescriptor> writeDescriptors,
+    uint32_t firstBinding)
+{
+    VKX_CTX_device;
+
+    std::vector<vk::WriteDescriptorSet> ls;
+    ls.reserve(writeDescriptors.size());
+
+    int bindingIdx = firstBinding;
+    for (auto& it : writeDescriptors)
+    {
+        vk::WriteDescriptorSet descriptorWrite{};
+        descriptorWrite.dstSet = descriptorSet;
+        descriptorWrite.dstBinding = bindingIdx;
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorCount = 1;
+
+        assert((it.buffer.buffer != 0) != (it.image.imageView != 0) && "requires only one is valid.");
+
+        if (it.buffer.buffer)
+        {
+            descriptorWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
+            descriptorWrite.pBufferInfo = &it.buffer;
+        } 
+        else
+        {
+            descriptorWrite.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+            descriptorWrite.pImageInfo = &it.image;
+        }
+
+        ls.push_back(descriptorWrite);
+        ++bindingIdx;
+    }
+
+    device.updateDescriptorSets(ls, {});
 }
 
 #pragma endregion
@@ -1389,7 +1532,7 @@ static void _CreateSwapchain(
     vk::Extent2D&				out_SwapchainExtent         = vkx::ctx().SwapchainExtent,
     std::vector<vk::Image>&		out_SwapchainImages         = vkx::ctx().SwapchainImages,
     std::vector<vk::ImageView>&	out_SwapchainImageViews     = vkx::ctx().SwapchainImageViews,
-    vkx::Image&                 out_SwapchainDepthImage     = vkx::ctx().SwapchainDepthImage,
+    vkx::Image*&                out_SwapchainDepthImage     = vkx::ctx().SwapchainDepthImage,
     std::vector<vk::Framebuffer>& out_SwapchainFramebuffers = vkx::ctx().SwapchainFramebuffers)
 {
     VKX_CTX_device_allocator;
@@ -1458,26 +1601,19 @@ static void _CreateSwapchain(
     for (size_t i = 0; i < swapchainImageCount; i++)
     {
         out_SwapchainFramebuffers[i] = vkx::CreateFramebuffer(out_SwapchainExtent, renderPass,
-            { { out_SwapchainImageViews[i], out_SwapchainDepthImage.imageView } });
+            { { out_SwapchainImageViews[i], out_SwapchainDepthImage->imageView } });
     }
-}
-static void _DestroyVkxImage(vkx::Image img) {
-
-    VKX_CTX_device_allocator;
-    device.destroyImage(img.image, allocator);
-    device.freeMemory(img.imageMemory, allocator);
-    device.destroyImageView(img.imageView, allocator);
 }
 
 static void _DestroySwapchain(
     const std::vector<vk::Framebuffer>& swapchainFramebuffers = vkx::ctx().SwapchainFramebuffers,
     const std::vector<vk::ImageView>& swapchainImageViews = vkx::ctx().SwapchainImageViews,
-    vkx::Image& depthImage = vkx::ctx().SwapchainDepthImage,
+    vkx::Image*& depthImage = vkx::ctx().SwapchainDepthImage,
     vk::SwapchainKHR swapchainKHR = vkx::ctx().SwapchainKHR)
 {
     VKX_CTX_device_allocator;
 
-    _DestroyVkxImage(depthImage);
+    delete depthImage;
 
     for (auto fb : swapchainFramebuffers) {
         device.destroyFramebuffer(fb, allocator);

@@ -25,8 +25,11 @@ layout(binding = 0) uniform UniformBufferObject {
 } ubo;
 
 layout(location = 0) out vec3 out_Pos;
+layout(location = 1) out vec2 out_uv;
 
-void main() {
+void main() 
+{
+    out_uv = in_uv;
     out_Pos = color[gl_VertexIndex] * cos(ubo.Time) * 0.5 + 0.5;
     gl_Position = vec4(in_pos, 1.0);
 }
