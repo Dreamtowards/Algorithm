@@ -46,7 +46,7 @@ void RenderEngine::Init()
         },
         g_PipelineLayout,
         {},
-        vkx::ctx().MainRenderPass);
+        vkx::ctx().MainRenderPass, 0);
 
 
     //TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));
@@ -98,15 +98,14 @@ void RenderEngine::Render()
     if (Window::IsFramebufferResized())
         vkx::RecreateSwapchain();
 
-    VKX_CTX_device;
-    auto& vkxc = vkx::ctx();
+    VKX_CTX_device_allocator;
 
     int fif_i = vkxc.CurrentInflightFrame;
     vkx::CommandBuffer cmd{ vkxc.CommandBuffers[fif_i] };
 
     {
         // blocking until the CommandBuffer has finished executing
-        device.waitForFences(vkxc.CommandBufferFences[fif_i], VK_TRUE, UINT64_MAX);
+        device.waitForFences(vkxc.CommandBufferFences[fif_i], true, UINT64_MAX);
 
         // acquire swapchain image, and signal SemaphoreImageAcquired[i] when acquired. (when the presentation engine is finished using the image)
         vkxc.CurrentSwapchainImage =
@@ -124,6 +123,8 @@ void RenderEngine::Render()
 
         cmd.SetViewport({}, vkxc.SwapchainExtent);
         cmd.SetScissor({}, vkxc.SwapchainExtent);
+
+        cmd.Draw(3);
 
         ImGui::ShowDemoWindow();
 

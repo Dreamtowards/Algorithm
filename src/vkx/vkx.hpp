@@ -17,6 +17,8 @@
 #define VKX_BACKEND_eGLFW 1
 #define VKX_BACKEND VKX_BACKEND_eGLFW
 
+#define VKX_VIEWPORT_NEG_HEIGHT 1
+
 
 #include <functional>
 #include <iostream>   // for default DebugMessengerCallback impl.
@@ -240,6 +242,8 @@ namespace vkx
 
 		void SetScissor(vk::Offset2D offset, vk::Extent2D extent);
 
+		void Draw(uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0);
+
 	};
 
 	#pragma endregion
@@ -334,6 +338,10 @@ namespace vkx
 	struct FnArg_CreateGraphicsPipeline
 	{
 		vk::PrimitiveTopology topology = vk::PrimitiveTopology::eTriangleList;
+		// RasterizationState
+		vk::PolygonMode		polygonMode = vk::PolygonMode::eFill;
+		vk::CullModeFlags	cullMode = vk::CullModeFlagBits::eBack;
+		vk::FrontFace		frontFace = vk::FrontFace::eCounterClockwise;
 		std::vector<vk::DynamicState> dynamicStates = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
 	};
 

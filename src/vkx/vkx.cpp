@@ -231,18 +231,28 @@ void vkx::CommandBuffer::SetViewport(
     vk::Viewport viewport{
        .x = (float)offset.x,
        .y = (float)offset.y,
-       .width = (float)extent.width,
-       .height = (float)extent.height,
+       .width   = (float)extent.width,
+       .height  = (float)extent.height,
        .minDepth = minDepth,
        .maxDepth = maxDepth
     };
+#ifdef VKX_VIEWPORT_NEG_HEIGHT
+    viewport.y = (float)extent.height - (float)offset.y;   // Wrong. shoud CuurrentRenderPass.RenderAria.height - offset.y
+    viewport.height = -(float)extent.height,
+#endif // VKX_VIEWPORT_NEG_HEIGHT
     cmd.setViewport(0, viewport);
 }
 
+// negative viewport heights?
 void vkx::CommandBuffer::SetScissor(
     vk::Offset2D offset, vk::Extent2D extent)
 {
     cmd.setScissor(0, vk::Rect2D{ .offset = offset, .extent = extent });
+}
+
+void vkx::CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
+{
+    cmd.draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 #pragma endregion
@@ -740,17 +750,17 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
 
 
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.stageCount = shaderStages.size();
-    pipelineInfo.pStages = shaderStages.data();
-    pipelineInfo.pVertexInputState = &vertexInputState;
-    pipelineInfo.pInputAssemblyState = &inputAssemblyState;
+    pipelineInfo.stageCount         = shaderStages.size();
+    pipelineInfo.pStages            = shaderStages.data();
+    pipelineInfo.pVertexInputState  = &vertexInputState;
+    pipelineInfo.pInputAssemblyState= &inputAssemblyState;
     pipelineInfo.pTessellationState = nullptr;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizationState;
-    pipelineInfo.pMultisampleState = &multisampleState;
+    pipelineInfo.pViewportState     = &viewportState;
+    pipelineInfo.pRasterizationState= &rasterizationState;
+    pipelineInfo.pMultisampleState  = &multisampleState;
     pipelineInfo.pDepthStencilState = &depthStencilState;
-    pipelineInfo.pColorBlendState = &colorBlendState;
-    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.pColorBlendState   = &colorBlendState;
+    pipelineInfo.pDynamicState      = &dynamicState;
 
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
@@ -764,7 +774,6 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     {
         device.destroyShaderModule(it.module, allocator);
     }
-
     return pipeline;
 }
 
@@ -1044,6 +1053,11 @@ static vk::Device _CreateLogicalDevice(
     // Device Extensions  (needs check is supported?)
     std::vector<const char*> deviceExtensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+#ifdef VKX_VIEWPORT_NEG_HEIGHT
+            // VK_KHR_maintenance1 is required for using negative viewport heights
+		    // Note: This is core as of Vulkan 1.1. So if you target 1.1 you don't have to explicitly enable this
+            VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+#endif
 #ifdef __APPLE__
             "VK_KHR_portability_subset"
 #endif
