@@ -237,7 +237,7 @@ void vkx::CommandBuffer::SetViewport(
        .maxDepth = maxDepth
     };
 #ifdef VKX_VIEWPORT_NEG_HEIGHT
-    viewport.y = (float)extent.height - (float)offset.y;   // Wrong. shoud CuurrentRenderPass.RenderAria.height - offset.y
+    viewport.y = (float)offset.y + (float)extent.height;
     viewport.height = -(float)extent.height,
 #endif // VKX_VIEWPORT_NEG_HEIGHT
     cmd.setViewport(0, viewport);
@@ -1312,7 +1312,7 @@ void vkx::BeginMainRenderPass(vk::CommandBuffer cmdbuf)
         vkxc.SwapchainFramebuffers[vkxc.CurrentSwapchainImage],
         vkxc.SwapchainExtent,
         {
-            vkx::ClearValueColor(0, 0, 1, 1),
+            vkx::ClearValueColor(0, 0, 0, 1),
             vkx::ClearValueDepthStencil(1, 0)
         },
         vk::SubpassContents::eInline);
@@ -1320,7 +1320,7 @@ void vkx::BeginMainRenderPass(vk::CommandBuffer cmdbuf)
 
 void vkx::EndMainRenderPass(vk::CommandBuffer cmdbuf)
 {
-    cmdbuf.endRenderPass();
+    vkx::CommandBuffer(cmdbuf).EndRenderPass();
 }
 
 

@@ -17,6 +17,7 @@
 #define VKX_BACKEND_eGLFW 1
 #define VKX_BACKEND VKX_BACKEND_eGLFW
 
+// works via vkx::CommandBuffer::SetViewport. origin still keep LeftTop (vulkan original). only actually affects gl_Position -> neg .y
 #define VKX_VIEWPORT_NEG_HEIGHT 1
 
 
