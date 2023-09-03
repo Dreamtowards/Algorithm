@@ -200,6 +200,11 @@ namespace vkx
 		vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eVertexBuffer);
 
 
+	void* MapMemory(vk::DeviceMemory deviceMemory, vk::DeviceSize size, vk::DeviceSize offset = 0);
+
+	void UnmapMemory(vk::DeviceMemory deviceMemory);
+
+
 	class VertexBuffer
 	{
 	public:
@@ -368,7 +373,7 @@ namespace vkx
 	#pragma endregion
 
 
-	#pragma region GraphicsPipeline
+	#pragma region GraphicsPipeline, Descriptor
 
 
 	vk::PipelineColorBlendAttachmentState IPipelineColorBlendAttachment(
@@ -410,7 +415,38 @@ namespace vkx
 	public:
 		vk::Pipeline		Pipeline;
 		vk::PipelineLayout	PipelineLayout;
+		vk::DescriptorSetLayout DescriptorSetLayout;
 	};
+
+
+
+	vk::DescriptorSetLayout CreateDescriptorSetLayout(
+		vkx_slice_t<std::pair<vk::DescriptorType, vk::ShaderStageFlags>> bindings, 
+		uint32_t firstBinding = 0);
+
+
+	void AllocateDescriptorSets(
+		uint32_t descriptorSetCount,
+		vk::DescriptorSet* out_DescriptorSets,
+		vk::DescriptorSetLayout* descriptorSetLayouts);
+
+
+	class UniformBuffer
+	{
+	public:
+		vk::Buffer buffer;
+		vk::DeviceMemory bufferMemory;
+		void* mapped;
+		size_t size;
+
+		UniformBuffer(vk::Buffer buf, vk::DeviceMemory mem, void* mapped, size_t size);
+
+		~UniformBuffer();
+
+		void Upload(void* data);
+	};
+
+	vkx::UniformBuffer* CreateUniformBuffer(vk::DeviceSize size);
 
 	#pragma endregion
 

@@ -19,7 +19,57 @@ static vk::PipelineLayout g_PipelineLayout;
 
 static vkx::VertexBuffer* g_VBuffer;
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
+struct UBO_A
+{
+    glm::mat4 matProjection;
+    glm::mat4 matView;
+    glm::mat4 matModel;
+    float Time;
+};
+
+struct PC_A
+{
+    glm::mat4 matModel;
+};
+std::vector<vkx::UniformBuffer*> g_ubos;
+std::vector<vk::DescriptorSet> g_DescriptorSets;
+vk::DescriptorSetLayout g_DescriptorSetLayout;
+
+
+#define VKX_LIST_CREATE(ls, n, init) ls.resize(n); for (int _i = 0; _i < n; ++_i) { ls[_i] = init; }
+#define VKX_LIST_DELETE(ls) for (int _i = 0; _i < ls.size(); ++_i) { delete ls[_i]; }
+
+vk::WriteDescriptorSet IWriteDescriptorSet(
+    vk::DescriptorSet descriptorSet,
+    uint32_t binding,
+    vk::DescriptorType descriptorType,
+    void* info)
+{
+    vk::WriteDescriptorSet descriptorWrite{};
+    descriptorWrite.dstSet = descriptorSet;
+    descriptorWrite.dstBinding = binding;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.descriptorType = descriptorType;
+
+    if (descriptorType == vk::DescriptorType::eCombinedImageSampler)
+    {
+        descriptorWrite.pImageInfo = (vk::DescriptorImageInfo*)info;
+    }
+    else if (descriptorType == vk::DescriptorType::eUniformBuffer)
+    {
+        descriptorWrite.pBufferInfo = (vk::DescriptorBufferInfo*)info;
+    }
+    else
+    {
+        //descriptorWrite.pTexelBufferView = nullptr;
+        throw 44;
+    }
+    return descriptorWrite;
+}
 
 void RenderEngine::Init()
 {
@@ -36,8 +86,12 @@ void RenderEngine::Init()
 
     Imgui::Init();
 
+    g_DescriptorSetLayout = vkx::CreateDescriptorSetLayout(
+    {
+        {vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex}
+    });
 
-    g_PipelineLayout = vkx::CreatePipelineLayout({});
+    g_PipelineLayout = vkx::CreatePipelineLayout(g_DescriptorSetLayout);
 
     g_Pipeline = vkx::CreateGraphicsPipeline(
         {
@@ -67,11 +121,25 @@ void RenderEngine::Init()
     vtx.Indices.push_back(3);
 
 
-    //g_Buffer = vkx::CreateStagedBuffer(vtx.vtx_data(), vtx.vtx_size(), bufMem);
-
-    
     g_VBuffer = vkx::LoadVertexBuffer(vtx.vtx_span(), vtx.idx_span());
 
+    VKX_CTX_device_allocator;
+    
+    VKX_LIST_CREATE(g_ubos, vkxc.InflightFrames, vkx::CreateUniformBuffer(sizeof(UBO_A)));
+
+    std::vector<vk::DescriptorSetLayout> layouts(vkxc.InflightFrames, g_DescriptorSetLayout);
+    g_DescriptorSets.resize(vkxc.InflightFrames);
+    vkx::AllocateDescriptorSets(vkxc.InflightFrames, g_DescriptorSets.data(), layouts.data());
+
+    for (size_t i = 0; i < vkxc.InflightFrames; i++) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = g_ubos[i]->buffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(UBO_A);
+
+        vk::WriteDescriptorSet sets = IWriteDescriptorSet(g_DescriptorSets[i], 0, vk::DescriptorType::eUniformBuffer, &bufferInfo);
+        device.updateDescriptorSets(sets, {});
+    }
 
     //TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));
     //TEX_UVMAP = Loader::loadTexture("misc/uvmap.png");
@@ -108,6 +176,9 @@ void RenderEngine::Destroy()
     //delete TEX_WHITE;
     //delete TEX_UVMAP;
 
+    VKX_LIST_DELETE(g_ubos);
+    device.destroyDescriptorSetLayout(g_DescriptorSetLayout, allocator);
+
     delete g_VBuffer;
 
     Imgui::Destroy();
@@ -128,6 +199,19 @@ void RenderEngine::Render()
 
     int fif_i = vkxc.CurrentInflightFrame;
     vkx::CommandBuffer cmd{ vkxc.CommandBuffers[fif_i] };
+
+    {
+        float t = Window::PreciseTime();
+
+        UBO_A ubo;
+        ubo.matProjection = glm::perspective(glm::radians(45.0f), vkxc.SwapchainExtent.width/(float)vkxc.SwapchainExtent.height, 
+            0.1f, 1000.0f);
+        ubo.matView = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.matModel = glm::rotate(glm::mat4(1.0f), t * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.Time = t;
+
+        g_ubos[fif_i]->Upload(&ubo);
+    }
 
     {
         // blocking until the CommandBuffer has finished executing
@@ -152,6 +236,8 @@ void RenderEngine::Render()
 
         cmd.BindVertexBuffers(g_VBuffer->vertexBuffer);
         cmd.BindIndexBuffer(g_VBuffer->indexBuffer);
+
+        cmd.cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_PipelineLayout, 0, g_DescriptorSets[fif_i], {});
 
         cmd.DrawIndexed(6);
 

@@ -122,6 +122,19 @@ void vkx::CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize 
 }
 
 
+void* vkx::MapMemory(vk::DeviceMemory deviceMemory, vk::DeviceSize size, vk::DeviceSize offset)
+{
+    VKX_CTX_device;
+    return device.mapMemory(deviceMemory, offset, size, (vk::MemoryMapFlagBits)0);
+}
+
+void vkx::UnmapMemory(vk::DeviceMemory deviceMemory)
+{
+    VKX_CTX_device;
+    device.unmapMemory(deviceMemory);
+}
+
+
 vk::Buffer vkx::CreateStagedBuffer(
     const void* bufferData,
     vk::DeviceSize bufferSize,
@@ -135,9 +148,9 @@ vk::Buffer vkx::CreateStagedBuffer(
         vk::BufferUsageFlagBits::eTransferSrc,
         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-    void* mapped_dst = device.mapMemory(stagingBufferMemory, 0, bufferSize, (vk::MemoryMapFlagBits)0);
+    void* mapped_dst = vkx::MapMemory(stagingBufferMemory, bufferSize);
     std::memcpy(mapped_dst, bufferData, bufferSize);
-    device.unmapMemory(stagingBufferMemory);
+    vkx::UnmapMemory(stagingBufferMemory);
 
     vk::Buffer buffer = vkx::CreateBuffer(bufferSize, out_BufferMemory,
         vk::BufferUsageFlagBits::eTransferDst | usage,
@@ -183,7 +196,6 @@ vkx::VertexBuffer* vkx::LoadVertexBuffer(
 
 
 #pragma endregion
-
 
 
 #pragma region Image, ImageView. ImageSampler.
@@ -707,7 +719,7 @@ vk::Framebuffer vkx::CreateFramebuffer(
 #pragma endregion
 
 
-#pragma region Graphics Pipeline
+#pragma region Graphics Pipeline, Descriptor
 
 
 vk::PipelineVertexInputStateCreateInfo IPipelineVertexInputState(
@@ -915,6 +927,74 @@ vk::PipelineLayout vkx::CreatePipelineLayout(
     return device.createPipelineLayout(layoutInfo, allocator);
 }
 
+vk::DescriptorSetLayout vkx::CreateDescriptorSetLayout(
+    vkx_slice_t<std::pair<vk::DescriptorType, vk::ShaderStageFlags>> _bindings, uint32_t firstBinding)
+{
+    VKX_CTX_device_allocator;
+
+    std::vector<vk::DescriptorSetLayoutBinding> ls{ _bindings.size() };
+    uint32_t i = firstBinding;
+    for (auto& it : _bindings) {
+        ls[i] = vk::DescriptorSetLayoutBinding{
+            .binding = i,
+            .descriptorType = it.first,
+            .descriptorCount = 1,
+            .stageFlags = it.second,
+            .pImmutableSamplers = nullptr
+        };
+        ++i;
+    }
+
+    vk::DescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.bindingCount = ls.size();
+    layoutInfo.pBindings = ls.data();
+
+    return device.createDescriptorSetLayout(layoutInfo, allocator);
+}
+
+
+void vkx::AllocateDescriptorSets(
+    uint32_t descriptorSetCount,
+    vk::DescriptorSet* out_DescriptorSets, 
+    vk::DescriptorSetLayout* descriptorSetLayouts)
+{
+    VKX_CTX_device_allocator;
+
+    vk::DescriptorSetAllocateInfo allocInfo{};
+    allocInfo.descriptorPool = vkxc.DescriptorPool;
+    allocInfo.descriptorSetCount = descriptorSetCount;
+    allocInfo.pSetLayouts = descriptorSetLayouts;
+
+    VKX_CHECK(device.allocateDescriptorSets(&allocInfo, out_DescriptorSets));
+}
+
+
+vkx::UniformBuffer::UniformBuffer(vk::Buffer buf, vk::DeviceMemory mem, void* p, size_t n)
+    : buffer(buf), bufferMemory(mem), mapped(p), size(n) {}
+
+vkx::UniformBuffer::~UniformBuffer()
+{
+    VKX_CTX_device_allocator;
+    device.destroyBuffer(buffer, allocator);
+    device.freeMemory(bufferMemory, allocator);
+}
+
+void vkx::UniformBuffer::Upload(void* data)
+{
+    std::memcpy(mapped, data, size);
+}
+
+vkx::UniformBuffer* vkx::CreateUniformBuffer(vk::DeviceSize size)
+{
+    vk::DeviceMemory mem;
+    vk::Buffer buffer = vkx::CreateBuffer(size, mem,
+        vk::BufferUsageFlagBits::eUniformBuffer,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+    void* mapped = vkx::MapMemory(mem, size);
+
+    return new vkx::UniformBuffer(buffer, mem, mapped, size);
+}
 
 #pragma endregion
 
@@ -1210,30 +1290,29 @@ static vk::CommandPool _CreateCommandPool(
         }, allocator);
 }
 
-static vk::DescriptorPool _CreateDescriptorPool()
+static vk::DescriptorPool _CreateDescriptorPool(uint32_t n = 1000)
 {
     VKX_CTX_device_allocator;
-
     // tho kinda oversize.
     vk::DescriptorPoolSize pool_sizes[] =
     {
-            { vk::DescriptorType::eSampler,              1000 },
-            { vk::DescriptorType::eCombinedImageSampler, 1000 },
-            { vk::DescriptorType::eSampledImage,         1000 },
-            { vk::DescriptorType::eStorageImage,         1000 },
-            { vk::DescriptorType::eUniformTexelBuffer,   1000 },
-            { vk::DescriptorType::eStorageTexelBuffer,   1000 },
-            { vk::DescriptorType::eUniformBuffer,        1000 },
-            { vk::DescriptorType::eStorageBuffer,        1000 },
-            { vk::DescriptorType::eUniformBufferDynamic, 1000 },
-            { vk::DescriptorType::eStorageBufferDynamic, 1000 },
-            { vk::DescriptorType::eInputAttachment,      1000 }
+            { vk::DescriptorType::eSampler,              n },
+            { vk::DescriptorType::eCombinedImageSampler, n },
+            { vk::DescriptorType::eSampledImage,         n },
+            { vk::DescriptorType::eStorageImage,         n },
+            { vk::DescriptorType::eUniformTexelBuffer,   n },
+            { vk::DescriptorType::eStorageTexelBuffer,   n },
+            { vk::DescriptorType::eUniformBuffer,        n },
+            { vk::DescriptorType::eStorageBuffer,        n },
+            { vk::DescriptorType::eUniformBufferDynamic, n },
+            { vk::DescriptorType::eStorageBufferDynamic, n },
+            { vk::DescriptorType::eInputAttachment,      n }
     };
 
     return device.createDescriptorPool(
         vk::DescriptorPoolCreateInfo{
             .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-            .maxSets = 1000,
+            .maxSets = n,
             .poolSizeCount = std::size(pool_sizes),
             .pPoolSizes = pool_sizes
         }, allocator);

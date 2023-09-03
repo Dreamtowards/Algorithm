@@ -17,9 +17,16 @@ vec3 color[4] = vec3[](
     vec3(1,0,1)
 );
 
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    float Time;
+} ubo;
+
 layout(location = 0) out vec3 out_Pos;
 
 void main() {
-    out_Pos = color[gl_VertexIndex];
+    out_Pos = color[gl_VertexIndex] * cos(ubo.Time) * 0.5 + 0.5;
     gl_Position = vec4(in_pos, 1.0);
 }
