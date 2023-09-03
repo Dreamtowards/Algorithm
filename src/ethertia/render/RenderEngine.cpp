@@ -57,9 +57,14 @@ void RenderEngine::Init()
 
     Imgui::Init();
 
+    VKX_CTX_device_allocator;
 
-    auto img = Loader::LoadPNG_("C:/Dev/Algorithm/run/assets/misc/uvmap.png");
-    g_Tex = vkx::CreateStagedImage(img.width(), img.height(), img.pixels());
+
+    g_Tex = Loader::LoadImage("misc/uvmap.png");
+
+    int fif = vkxc.InflightFrames;
+
+    VKX_LIST_CREATE(g_ubos, fif, vkx::CreateUniformBuffer(sizeof(UBO_A)));
 
 
     g_Pipeline = vkx::CreateGraphicsPipeline(
@@ -80,6 +85,15 @@ void RenderEngine::Init()
         {},
         vkx::ctx().MainRenderPass, 0);
 
+    for (size_t i = 0; i < fif; i++)
+    {
+        vkx::WriteDescriptorSet(g_Pipeline->DescriptorSets[i],
+        {
+            {.buffer = vkx::IDescriptorBuffer(g_ubos[i]) },
+            {.image = vkx::IDescriptorImage(g_Tex->imageView) }
+        });
+    }
+
     VertexData vtx;
     vtx.addVertex({ {-0.5, -0.5, 0}, {0, 1}, {} });
     vtx.addVertex({ { 0.5, -0.5, 0}, {1, 1}, {} });
@@ -93,22 +107,8 @@ void RenderEngine::Init()
     vtx.Indices.push_back(2);
     vtx.Indices.push_back(3);
 
-
     g_VBuffer = vkx::LoadVertexBuffer(vtx.vtx_span(), vtx.idx_span());
 
-    VKX_CTX_device_allocator;
-    
-    VKX_LIST_CREATE(g_ubos, vkxc.InflightFrames, vkx::CreateUniformBuffer(sizeof(UBO_A)));
-
-
-    for (size_t i = 0; i < vkxc.InflightFrames; i++) 
-    {
-        vkx::WriteDescriptorSet(g_Pipeline->DescriptorSets[i],
-        {
-            { .buffer = vkx::IDescriptorBuffer(g_ubos[i]) },
-            { .image  = vkx::IDescriptorImage(g_Tex->imageView) }
-        });
-    }
 
 
     //TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));

@@ -6,6 +6,7 @@
 
 #include <format>
 #include <fstream>
+#include <filesystem>
 
 #include <ethertia/util/Log.h>
 
@@ -62,77 +63,60 @@ Loader::DataBlock Loader::LoadFile(const std::string& filename)
     return Loader::DataBlock(data, filesize, filename);
 }
 
+std::string Loader::FindAsset(const std::string& p)
+{
+    if (p.starts_with('.') || p.starts_with('/') || (p.length() >= 2 && p.find(':') == 1))
+        return p;
+    //for (const std::string& basepath : Settings::ASSETS)
+    {
+        std::string path = "assets/" + p;//basepath + p;
+        if (Loader::FileExists(path))
+            return path;
+    }
+    return "";
+}
 
-//std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> Loader::LoadShaders(
-//    std::string_view fmt)
-//{
-//    std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> ls;
-//    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("vert"))), vk::ShaderStageFlagBits::eVertex});
-//    ls.push_back({Loader::LoadFile(std::vformat(fmt, std::make_format_args("frag"))), vk::ShaderStageFlagBits::eFragment});
-//    return ls;
-//}
-/*
 
-bool Loader::fileExists(const std::filesystem::path& path)
+
+bool Loader::FileExists(const std::string& path)
 {
     return std::filesystem::exists(path);
 }
 
-#include <ethertia/init/Settings.h>
-
-std::string Loader::fileAssets(const std::string& p)
-{
-    for (const std::string& basepath : Settings::ASSETS)
-    {
-        std::string path = basepath + p;
-        if (Loader::fileExists(path))
-            return path;
-    }
-    return "";
-    //throw std::runtime_error(Strings::fmt("failed to locate assets file: {}", p));
-}
-
-std::string Loader::fileResolve(const std::string& p)
-{
-    if (p.starts_with('.') || p.starts_with('/') || (p.find(':') == 1))
-        return p;
-    else
-        return fileAssets(p);
-}
-
-Loader::DataBlock Loader::loadAssets(const std::string& p)
-{
-    return loadFile(fileAssets(p));
-}
-
-
-
-const std::string& Loader::fileMkdirs(const std::string& filename)
+const std::string& Loader::Mkdirs(const std::string& path)
 {
     // mkdirs for parents of the file.
-    int _dir = filename.rfind('/');
+    int _dir = path.rfind('/');
     if (_dir != std::string::npos) {
-        std::filesystem::create_directories(filename.substr(0, _dir));
+        std::filesystem::create_directories(path.substr(0, _dir));
     }
-    return filename;
+    return path;
 }
 
-
-
-size_t Loader::dirSize(const std::string& dir)
+size_t Loader::FileSize(const std::string& path)
 {
-    size_t sumSize = 0;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(dir))
+    if (!std::filesystem::exists(path))
+        return 0;
+    
+    if (std::filesystem::is_directory(path))
     {
-        if (!entry.is_directory()) {
-            sumSize += entry.file_size();
+        size_t sum = 0;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(path))
+        {
+            if (!entry.is_directory()) {
+                sum += entry.file_size();
+            }
         }
+        return sum;
     }
-    return sumSize;
+    else
+    {
+        return std::filesystem::file_size(path);
+    }
 }
 
 
-
+/*
 
 
 
@@ -407,19 +391,15 @@ VertexArray* loadVertexData(uint32_t vertexCount, std::initializer_list<int> att
 
 
 
+*/
 
-
-vkx::Image* Loader::loadTexture(const BitmapImage& img)
+vkx::Image* Loader::LoadImage(const BitmapImage& img)
 {
-    VkImage image;
-    VkDeviceMemory imageMemory;
-    VkImageView imageView;
-    vkx::CreateStagedImage(img.width(), img.height(), img.pixels(),
-                           &image, &imageMemory, &imageView);
-
-    return new vkx::Image(image, imageMemory, imageView, img.width(), img.height());
+    return vkx::CreateStagedImage(img.width(), img.height(), img.pixels());
 }
 
+
+/*
 vkx::Image* Loader::loadCubeMap(const BitmapImage* imgs)
 {
     int w = imgs[0].width();

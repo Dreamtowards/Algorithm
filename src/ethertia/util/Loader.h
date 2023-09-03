@@ -40,27 +40,25 @@ public:
     // load entire file.
     static DataBlock LoadFile(const std::string& filename);
 
-    //static std::vector<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> LoadShaders(std::string_view fmt);
-
-    /*
     // locate a real filename of an assets-path.
     // return empty string if cannot locate the assets file.
-    // if path str leading with './', '/', 'C:/', then just locate actual-path instead of asset-path
+    // if path str leading with './', '/', 'X:/', then just locate actual-path instead of asset-path
     static std::string FindAsset(const std::string& p);
 
-    // a quick utility func of `loadFile(fileAssets(p));`
-    static DataBlock LoadAsset(const std::string& p);
+    // a quick utility func of `LoadFile(LocateAsset(p));`
+    static DataBlock LoadAsset(const std::string& uri) { return Loader::LoadFile(Loader::FindAsset(uri)); }
 
 
-    static bool FileExists(const std::filesystem::path& path);
+    static bool FileExists(const std::string& filename);
 
     // mkdirs for the "dir/" or a file's parent dir "dir/somefile"
-    static const std::string& Mkdirs(const std::string& filename);
+    static const std::string& Mkdirs(const std::string& path);
 
     // !Heavy IO Cost. recursive calc all file size.
-    static size_t FileSize(const std::string& dir);
+    static size_t FileSize(const std::string& path);
 
 
+    /*
 
 
 
@@ -87,10 +85,10 @@ public:
     // internal. stbi_load(filename). load file directly might optimizer than stbi_load_from_memory.
     static BitmapImage LoadPNG_(const char* filename);
 
+    static BitmapImage LoadPNG(const std::string& uri) { return Loader::LoadPNG_(Loader::FindAsset(uri).c_str()); }
+
+
     /*
-    static BitmapImage loadPNG(const std::string& uri) { return Loader::loadPNG_(Loader::FindAsset(uri).c_str()); }
-
-
     // stbi_load_from_memory().
     // static BitmapImage loadPNG(const void* data, size_t len);
 
@@ -150,13 +148,13 @@ public:
 //    static vkx::Image* loadTexture(int w, int h, void* pixels_VertFlip,
 //                                int intlfmt = GL_RGBA, int fmt = GL_RGBA, int type = GL_UNSIGNED_BYTE);
 
-
+*/
     // Image ? Texture
-    static vkx::Image* loadTexture(const BitmapImage& img);
+    static vkx::Image* LoadImage(const BitmapImage& img);
 
-    static vkx::Image* loadTexture(const std::string& filepath) { return Loader::loadTexture(Loader::loadPNG(filepath)); }
+    static vkx::Image* LoadImage(const std::string& uri) { return Loader::LoadImage(Loader::LoadPNG(uri)); }
 
-
+    /*
     // @imgs 6 Images, order: +X Right, -X Left, +Y Top, -Y Bottom, +Z Front, -Z Back.
     static vkx::Image* loadCubeMap(const BitmapImage* imgs);
 
