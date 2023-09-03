@@ -17,8 +17,7 @@
 static vk::Pipeline g_Pipeline;
 static vk::PipelineLayout g_PipelineLayout;
 
-static vk::Buffer g_Buffer;
-vk::DeviceMemory bufMem;
+static vkx::VertexBuffer* g_VBuffer;
 
 
 
@@ -57,10 +56,22 @@ void RenderEngine::Init()
     VertexData vtx;
     vtx.addVertex({ {-0.5, -0.5, 0}, {}, {} });
     vtx.addVertex({ { 0.5, -0.5, 0}, {}, {} });
-    vtx.addVertex({ { 0.5, 0.5, 0}, {}, {} });
+    vtx.addVertex({ { 0.5,  0.5, 0}, {}, {} });
+    vtx.addVertex({ {-0.5,  0.5, 0}, {}, {} });
+
+    vtx.Indices.push_back(0);
+    vtx.Indices.push_back(1);
+    vtx.Indices.push_back(2);
+    vtx.Indices.push_back(0);
+    vtx.Indices.push_back(2);
+    vtx.Indices.push_back(3);
 
 
-    g_Buffer = vkx::CreateStagedBuffer(vtx.vtx_data(), vtx.vtx_size(), bufMem);
+    //g_Buffer = vkx::CreateStagedBuffer(vtx.vtx_data(), vtx.vtx_size(), bufMem);
+
+    
+    g_VBuffer = vkx::LoadVertexBuffer(vtx.vtx_span(), vtx.idx_span());
+
 
     //TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));
     //TEX_UVMAP = Loader::loadTexture("misc/uvmap.png");
@@ -97,8 +108,7 @@ void RenderEngine::Destroy()
     //delete TEX_WHITE;
     //delete TEX_UVMAP;
 
-    device.destroyBuffer(g_Buffer, allocator);
-    device.freeMemory(bufMem, allocator);
+    delete g_VBuffer;
 
     Imgui::Destroy();
 
@@ -140,9 +150,10 @@ void RenderEngine::Render()
         cmd.SetViewport({}, vkxc.SwapchainExtent);
         cmd.SetScissor({}, vkxc.SwapchainExtent);
 
-        cmd.BindVertexBuffers(g_Buffer);
+        cmd.BindVertexBuffers(g_VBuffer->vertexBuffer);
+        cmd.BindIndexBuffer(g_VBuffer->indexBuffer);
 
-        cmd.Draw(3);
+        cmd.DrawIndexed(6);
 
         ImGui::ShowDemoWindow();
 

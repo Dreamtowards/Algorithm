@@ -151,6 +151,37 @@ vk::Buffer vkx::CreateStagedBuffer(
     return buffer;
 }
 
+
+vkx::VertexBuffer::VertexBuffer(vk::Buffer vb, vk::DeviceMemory vbm, vk::Buffer ib, vk::DeviceMemory ibm)
+    : vertexBuffer(vb), vertexBufferMemory(vbm), indexBuffer(ib), indexBufferMemory(ibm) {}
+
+vkx::VertexBuffer::~VertexBuffer()
+{
+    VKX_CTX_device_allocator;
+
+    device.destroyBuffer(vertexBuffer, allocator);
+    device.freeMemory(vertexBufferMemory, allocator);
+    device.destroyBuffer(indexBuffer, allocator);
+    device.freeMemory(indexBufferMemory, allocator);
+}
+
+vkx::VertexBuffer* vkx::LoadVertexBuffer(
+    vkx_slice_t<const char> vertices,
+    vkx_slice_t<const char> indices)
+{
+    vk::DeviceMemory vtxmem;
+    vk::Buffer vtxbuf = vkx::CreateStagedBuffer(vertices.data(), vertices.size(), vtxmem, vk::BufferUsageFlagBits::eVertexBuffer);
+
+    vk::DeviceMemory idxmem{};
+    vk::Buffer idxbuf{};
+    if (indices.size())
+    {
+        idxbuf = vkx::CreateStagedBuffer(indices.data(), indices.size(), idxmem, vk::BufferUsageFlagBits::eIndexBuffer);
+    }
+    return new vkx::VertexBuffer(vtxbuf, vtxmem, idxbuf, idxmem);
+}
+
+
 #pragma endregion
 
 
@@ -391,9 +422,10 @@ void vkx::AllocateCommandBuffers(
 void vkx::SubmitCommandBuffer(
     const std::function<void(vk::CommandBuffer)>& fn_record,
     vk::Queue queue,
-    vk::CommandPool commandPool,
-    vk::Device device)
+    vk::CommandPool commandPool)
 {
+    VKX_CTX_device;
+
     vk::CommandBuffer cmdbuf;
     vkx::AllocateCommandBuffers(1, &cmdbuf, vk::CommandBufferLevel::ePrimary);
 
@@ -545,9 +577,19 @@ void vkx::CommandBuffer::BindVertexBuffers(
     cmd.bindVertexBuffers(firstBinding, buffers, offsets.size() == 0 ? vkx_slice_t{buffers.size(), _zeros} : offsets);
 }
 
+void vkx::CommandBuffer::BindIndexBuffer(vk::Buffer buffer, vk::DeviceSize offset, vk::IndexType indexType)
+{
+    cmd.bindIndexBuffer(buffer, offset, indexType);
+}
+
 void vkx::CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
 {
     cmd.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+void vkx::CommandBuffer::DrawIndexed(uint32_t vertexCount)
+{
+    cmd.drawIndexed(vertexCount, 1, 0, 0, 0);
 }
 
 #pragma endregion

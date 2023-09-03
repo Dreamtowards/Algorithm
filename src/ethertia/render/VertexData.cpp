@@ -9,12 +9,12 @@
 
 
 
-const void* VertexData::data() const {
-    return Vertices.data();
-}
-size_t VertexData::size() const {
-    return sizeof(Vertices[0]) * Vertices.size();
-}
+//const void* VertexData::data() const {
+//    return Vertices.data();
+//}
+//size_t VertexData::size() const {
+//    return sizeof(Vertices[0]) * Vertices.size();
+//}
 
 const void* VertexData::vtx_data() const {
     return Vertices.data();
@@ -29,6 +29,17 @@ const void* VertexData::idx_data() const {
 size_t VertexData::idx_size() const {
     return sizeof(Indices[0]) * Indices.size();
 }
+
+
+std::span<const char> VertexData::vtx_span() const
+{
+    return {(const char*)vtx_data(), vtx_size()};
+}
+std::span<const char> VertexData::idx_span() const
+{
+    return {(const char*)idx_data(), idx_size()};
+}
+
 
 size_t VertexData::vertexCount() const
 {

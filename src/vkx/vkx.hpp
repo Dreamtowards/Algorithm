@@ -28,7 +28,24 @@
 
 namespace vkx
 {
+
+	#pragma region base
+
+	const vk::Result&	check(const vk::Result& r);
+	const VkResult&		check(const VkResult& r);
+
+	template<typename T>
+	const T& check(const vk::ResultValue<T>& r)
+	{
+		vkx::check(r.result);
+		return r.value;
+	}
+
+	uint32_t FormatSize(vk::Format fmt);
+
+	#pragma endregion
 	
+	#pragma region ctx
 
 	class Image
 	{
@@ -46,20 +63,6 @@ namespace vkx
 			image(image), imageMemory(imageMemory), format(format), width(width), height(height), imageView(imageView) {}
 
 	};
-
-	const vk::Result&	check(const vk::Result& r);
-	const VkResult&		check(const VkResult& r);
-
-	template<typename T>
-	const T& check(const vk::ResultValue<T>& r)
-	{
-		vkx::check(r.result);
-		return r.value;
-	}
-
-	uint32_t FormatSize(vk::Format fmt);
-
-	#pragma region ctx
 
 	struct QueueFamilyIndices
 	{
@@ -169,9 +172,7 @@ namespace vkx
 
 
 
-
-
-	#pragma region AllocateMemory, CreateBuffer
+	#pragma region AllocateMemory, Buffer
 
 	vk::DeviceMemory AllocateMemory(
 		vk::MemoryRequirements memRequirements,  // size, alignment, memoryType
@@ -199,6 +200,24 @@ namespace vkx
 		vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eVertexBuffer);
 
 
+	class VertexBuffer
+	{
+	public:
+		vk::Buffer			vertexBuffer;
+		vk::DeviceMemory	vertexBufferMemory;
+		vk::Buffer			indexBuffer;
+		vk::DeviceMemory	indexBufferMemory;
+
+		VertexBuffer(vk::Buffer vb, vk::DeviceMemory vbm, vk::Buffer ib, vk::DeviceMemory ibm);
+
+		~VertexBuffer();
+	};
+
+	vkx::VertexBuffer* LoadVertexBuffer(
+		vkx_slice_t<const char> vertices,
+		vkx_slice_t<const char> indices = {});
+
+
 	#pragma endregion
 
 
@@ -216,8 +235,7 @@ namespace vkx
 	void SubmitCommandBuffer(
 		const std::function<void(vk::CommandBuffer)>& fn_record,
 		vk::Queue queue = vkx::ctx().GraphicsQueue,
-		vk::CommandPool commandPool = vkx::ctx().CommandPool,
-		vk::Device device = vkx::ctx().Device);
+		vk::CommandPool commandPool = vkx::ctx().CommandPool);
 
 	void QueueSubmit(
 		vk::Queue queue,
@@ -267,7 +285,11 @@ namespace vkx
 
 		void BindVertexBuffers(vkx_slice_t<vk::Buffer> buffers, vkx_slice_t<vk::DeviceSize> offsets = {}, uint32_t firstBinding = 0);
 
+		void BindIndexBuffer(vk::Buffer buffer, vk::DeviceSize offset = 0, vk::IndexType indexType = vk::IndexType::eUint32);
+
 		void Draw(uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0);
+
+		void DrawIndexed(uint32_t vertexCount);
 
 	};
 
@@ -346,7 +368,7 @@ namespace vkx
 	#pragma endregion
 
 
-	#pragma region Graphics Pipeline
+	#pragma region GraphicsPipeline
 
 
 	vk::PipelineColorBlendAttachmentState IPipelineColorBlendAttachment(
@@ -391,5 +413,12 @@ namespace vkx
 	};
 
 	#pragma endregion
+
+
+
+
+
+
+
 
 }

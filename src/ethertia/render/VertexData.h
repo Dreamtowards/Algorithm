@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <string>
+#include <span>
 
 #include <glm/glm.hpp>
 
@@ -38,8 +39,8 @@ public:
 
     std::string m_Filename;  // dbg
 
-    const void* data() const;  // vtx_data
-    size_t size() const;       // vtx_size
+    //const void* data() const;  // vtx_data
+    //size_t size() const;       // vtx_size
 
     const void* vtx_data() const;
     size_t vtx_size() const;
@@ -47,6 +48,8 @@ public:
     const void* idx_data() const;
     size_t idx_size() const;
 
+    std::span<const char> vtx_span() const;
+    std::span<const char> idx_span() const;
 
     bool isIndexed() const;
 
