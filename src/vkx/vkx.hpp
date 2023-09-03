@@ -155,6 +155,11 @@ namespace vkx
 
 	void RecreateSwapchain(bool destroy = true, bool create = true);
 
+	void BeginMainRenderPass(vk::CommandBuffer cmdbuf);
+	
+	void EndMainRenderPass(vk::CommandBuffer cmdbuf);
+
+
 	#pragma endregion
 
 
@@ -182,15 +187,6 @@ namespace vkx
 		vk::Device device = vkx::ctx().Device);
 
 
-	void BeginCommandBuffer(
-		vk::CommandBuffer cmdbuf,
-		vk::CommandBufferUsageFlags usageFlags);
-
-	// ICmd
-	vk::CommandBufferBeginInfo ICommandBufferBegin(
-		vk::CommandBufferUsageFlags usageFlags);
-
-
 	// Allocate & Record & Submit Onetime CommandBuffer
 	void SubmitCommandBuffer(
 		const std::function<void(vk::CommandBuffer)>& fn_record,
@@ -211,6 +207,40 @@ namespace vkx
 		vkx_slice_t<vk::Semaphore> waitSemaphores,
 		vkx_slice_t<vk::SwapchainKHR> swapchains,
 		vkx_slice_t<uint32_t> imageIndices);
+
+	class CommandBuffer
+	{
+	public:
+		vk::CommandBuffer cmd;
+
+		CommandBuffer(vk::CommandBuffer cmdbuf);
+
+		operator VkCommandBuffer();
+
+		operator vk::CommandBuffer();
+
+		void Reset();
+
+		void Begin(vk::CommandBufferUsageFlags usageFlags);
+
+		void End();
+
+		void BeginRenderPass(
+			vk::RenderPass renderPass,
+			vk::Framebuffer framebuffer,
+			vk::Extent2D renderArea,
+			vkx_slice_t<vk::ClearValue> clearValues,
+			vk::SubpassContents subpassContents = vk::SubpassContents::eInline);
+
+		void EndRenderPass();
+
+		void BindGraphicsPipeline(vk::Pipeline graphicsPipeline);
+
+		void SetViewport(vk::Offset2D offset, vk::Extent2D extent, float minDepth = 0.0f, float maxDepth = 1.0f);
+
+		void SetScissor(vk::Offset2D offset, vk::Extent2D extent);
+
+	};
 
 	#pragma endregion
 
@@ -269,11 +299,11 @@ namespace vkx
 		vk::DependencyFlags dependencyFlags = {});
 
 	// ICmd
-	vk::RenderPassBeginInfo IRenderPassBegin(
-		vk::RenderPass renderPass,
-		vk::Framebuffer framebuffer,
-		vk::Extent2D renderAreaExtent,
-		vkx_slice_t<vk::ClearValue> clearValues);
+	//vk::RenderPassBeginInfo IRenderPassBegin(
+	//	vk::RenderPass renderPass,
+	//	vk::Framebuffer framebuffer,
+	//	vk::Extent2D renderArea,
+	//	vkx_slice_t<vk::ClearValue> clearValues);
 
 	vk::ClearValue ClearValueColor(float r = 0, float g = 0, float b = 0, float a = 1);
 
@@ -287,7 +317,7 @@ namespace vkx
 	#pragma endregion
 
 
-#pragma region Graphics Pipeline
+	#pragma region Graphics Pipeline
 
 
 	vk::PipelineColorBlendAttachmentState IPipelineColorBlendAttachment(
@@ -319,6 +349,6 @@ namespace vkx
 		vkx_slice_t<vk::DescriptorSetLayout> setLayouts,
 		vkx_slice_t<vk::PushConstantRange> pushConstantRanges = {});
 
-#pragma endregion
+	#pragma endregion
 
 }

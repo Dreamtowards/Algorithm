@@ -103,19 +103,6 @@ void vkx::AllocateCommandBuffers(
     VKX_CHECK(device.allocateCommandBuffers(&allocInfo, pCmdbufs));
 }
 
-void vkx::BeginCommandBuffer(
-    vk::CommandBuffer cmdbuf,
-    vk::CommandBufferUsageFlags usageFlags)
-{
-    cmdbuf.begin(vk::CommandBufferBeginInfo{ .flags = usageFlags });
-}
-
-vk::CommandBufferBeginInfo vkx::ICommandBufferBegin(
-    vk::CommandBufferUsageFlags usageFlags)
-{
-    return vk::CommandBufferBeginInfo{ .flags = usageFlags };
-}
-
 void vkx::SubmitCommandBuffer(
     const std::function<void(vk::CommandBuffer)>& fn_record,
     vk::Queue queue,
@@ -125,7 +112,7 @@ void vkx::SubmitCommandBuffer(
     vk::CommandBuffer cmdbuf;
     vkx::AllocateCommandBuffers(1, &cmdbuf, vk::CommandBufferLevel::ePrimary);
 
-    vkx::BeginCommandBuffer(cmdbuf, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    cmdbuf.begin(vk::CommandBufferBeginInfo{ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
 
     fn_record(cmdbuf);
 
@@ -178,8 +165,84 @@ vk::Result vkx::QueuePresentKHR(
     presentInfo.pSwapchains = swapchains.data();
     presentInfo.pImageIndices = imageIndices.data();
 
-    return (vk::Result)vkQueuePresentKHR(presentQueue, (VkPresentInfoKHR*)&presentInfo);
-    //return presentQueue.presentKHR(&presentInfo);
+    return presentQueue.presentKHR(&presentInfo);
+}
+
+
+vkx::CommandBuffer::CommandBuffer(vk::CommandBuffer cmdbuf) 
+    : cmd(cmdbuf) {}
+
+vkx::CommandBuffer::operator VkCommandBuffer() {
+    return cmd;
+}
+vkx::CommandBuffer::operator vk::CommandBuffer() {
+    return cmd;
+}
+
+void vkx::CommandBuffer::Reset()
+{
+    cmd.reset();
+}
+
+void vkx::CommandBuffer::Begin(vk::CommandBufferUsageFlags usageFlags)
+{
+    vk::CommandBufferBeginInfo beginInfo{ .flags = usageFlags };
+    cmd.begin(beginInfo);
+}
+
+void vkx::CommandBuffer::End()
+{
+    cmd.end();
+}
+
+
+void vkx::CommandBuffer::BeginRenderPass(
+    vk::RenderPass renderPass,
+    vk::Framebuffer framebuffer,
+    vk::Extent2D renderArea,
+    vkx_slice_t<vk::ClearValue> clearValues,
+    vk::SubpassContents subpassContents)
+{
+    vk::RenderPassBeginInfo beginInfo{};
+    beginInfo.renderPass = renderPass;
+    beginInfo.framebuffer = framebuffer;
+    beginInfo.renderArea.offset = { 0, 0 };
+    beginInfo.renderArea.extent = renderArea;
+    beginInfo.clearValueCount = clearValues.size();
+    beginInfo.pClearValues = clearValues.data();
+
+    cmd.beginRenderPass(beginInfo, subpassContents);
+}
+
+void vkx::CommandBuffer::EndRenderPass()
+{
+    cmd.endRenderPass();
+}
+
+void vkx::CommandBuffer::BindGraphicsPipeline(vk::Pipeline graphicsPipeline)
+{
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+}
+
+void vkx::CommandBuffer::SetViewport(
+    vk::Offset2D offset, vk::Extent2D extent,
+    float minDepth, float maxDepth)
+{
+    vk::Viewport viewport{
+       .x = (float)offset.x,
+       .y = (float)offset.y,
+       .width = (float)extent.width,
+       .height = (float)extent.height,
+       .minDepth = minDepth,
+       .maxDepth = maxDepth
+    };
+    cmd.setViewport(0, viewport);
+}
+
+void vkx::CommandBuffer::SetScissor(
+    vk::Offset2D offset, vk::Extent2D extent)
+{
+    cmd.setScissor(0, vk::Rect2D{ .offset = offset, .extent = extent });
 }
 
 #pragma endregion
@@ -480,24 +543,6 @@ vk::SubpassDependency vkx::ISubpassDependency(
     dependency.dependencyFlags = dependencyFlags;
     
     return dependency;
-}
-
-
-vk::RenderPassBeginInfo vkx::IRenderPassBegin(
-    vk::RenderPass renderPass,
-    vk::Framebuffer framebuffer,
-    vk::Extent2D renderAreaExtent,
-    vkx_slice_t<vk::ClearValue> clearValues)
-{
-    vk::RenderPassBeginInfo beginInfo{};
-    beginInfo.renderPass = renderPass;
-    beginInfo.framebuffer = framebuffer;
-    beginInfo.renderArea.offset = { 0, 0 };
-    beginInfo.renderArea.extent = renderAreaExtent;
-    beginInfo.clearValueCount = clearValues.size();
-    beginInfo.pClearValues = clearValues.data();
-
-    return beginInfo;
 }
 
 vk::ClearValue vkx::ClearValueColor(float r, float g, float b, float a)
@@ -1244,6 +1289,25 @@ void vkx::RecreateSwapchain(bool destroy, bool create)
     }
 }
 
+void vkx::BeginMainRenderPass(vk::CommandBuffer cmdbuf)
+{
+    VKX_CTX_device_allocator;
+
+    vkx::CommandBuffer(cmdbuf).BeginRenderPass(
+        vkxc.MainRenderPass,
+        vkxc.SwapchainFramebuffers[vkxc.CurrentSwapchainImage],
+        vkxc.SwapchainExtent,
+        {
+            vkx::ClearValueColor(0, 0, 1, 1),
+            vkx::ClearValueDepthStencil(1, 0)
+        },
+        vk::SubpassContents::eInline);
+}
+
+void vkx::EndMainRenderPass(vk::CommandBuffer cmdbuf)
+{
+    cmdbuf.endRenderPass();
+}
 
 
 #pragma endregion
