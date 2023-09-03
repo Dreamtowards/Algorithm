@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <set>
+#include <cmath>
 
 
 #pragma region base
@@ -283,8 +284,7 @@ vk::Sampler vkx::CreateImageSampler(
     samplerInfo.addressModeW = addressModeUVW;
 
     samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = gpuProperties.limits.maxSamplerAnisotropy;
-    std::cout << "GPU maxSamplerAnisotropy " << gpuProperties.limits.maxSamplerAnisotropy << "\n";
+    samplerInfo.maxAnisotropy = std::min(4.0f, gpuProperties.limits.maxSamplerAnisotropy);
 
     samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
@@ -875,10 +875,10 @@ static vk::PipelineShaderStageCreateInfo _CreateShaderModule_IPipelineShaderStag
 }
 
 
-vk::Pipeline vkx::CreateGraphicsPipeline(
+vkx::GraphicsPipeline* vkx::CreateGraphicsPipeline(
     vkx_slice_t<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> shaderStageSources,
     std::initializer_list<vk::Format> vertexInputAttribFormats,
-    vk::PipelineLayout pipelineLayout,
+    vk::DescriptorSetLayout descriptorSetLayout,
     vkx::FnArg_CreateGraphicsPipeline args,
     vk::RenderPass renderPass,
     uint32_t subpass)
@@ -886,7 +886,7 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     VKX_CTX_device_allocator;
 
     std::vector<vk::PipelineShaderStageCreateInfo> shaderStages;
-    for (auto& it : shaderStageSources)
+    for (auto& it : shaderStageSources) 
     {
         shaderStages.push_back(_CreateShaderModule_IPipelineShaderStage(it.first, it.second));
     }
@@ -908,7 +908,6 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
 
-
     vk::PipelineRasterizationStateCreateInfo rasterizationState{};
     rasterizationState.polygonMode = vk::PolygonMode::eFill;
     rasterizationState.cullMode = vk::CullModeFlagBits::eBack;
@@ -918,7 +917,6 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     rasterizationState.rasterizerDiscardEnable = VK_FALSE;
     rasterizationState.lineWidth = 1.0f;
 
-
     vk::PipelineMultisampleStateCreateInfo multisampleState{};
     multisampleState.sampleShadingEnable = VK_FALSE;
     multisampleState.rasterizationSamples = vk::SampleCountFlagBits::e1;
@@ -926,7 +924,6 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     multisampleState.pSampleMask = nullptr; // Optional
     multisampleState.alphaToCoverageEnable = VK_FALSE; // Optional
     multisampleState.alphaToOneEnable = VK_FALSE; // Optional
-
 
     vk::PipelineDepthStencilStateCreateInfo depthStencilState{};
     depthStencilState.depthTestEnable = VK_TRUE;
@@ -938,7 +935,6 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     depthStencilState.stencilTestEnable = VK_FALSE;
     depthStencilState.front = {};
     depthStencilState.back = {};
-
 
     vk::PipelineColorBlendAttachmentState colorBlendAttachment = vkx::IPipelineColorBlendAttachment();
     
@@ -952,10 +948,12 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     colorBlendState.blendConstants[2] = 0.0f; 
     colorBlendState.blendConstants[3] = 0.0f; 
 
-
     vk::PipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.dynamicStateCount = args.dynamicStates.size();
     dynamicState.pDynamicStates = args.dynamicStates.data();
+
+
+    vk::PipelineLayout pipelineLayout = vkx::CreatePipelineLayout(descriptorSetLayout);
 
 
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
@@ -983,8 +981,20 @@ vk::Pipeline vkx::CreateGraphicsPipeline(
     {
         device.destroyShaderModule(it.module, allocator);
     }
-    return pipeline;
+
+    vkx::GraphicsPipeline* gp = new vkx::GraphicsPipeline();
+    gp->Pipeline = pipeline;
+    gp->PipelineLayout = pipelineLayout;
+    gp->DescriptorSetLayout = descriptorSetLayout;
+
+    const int fif = vkxc.InflightFrames;
+    gp->DescriptorSets.resize(fif);
+    std::vector<vk::DescriptorSetLayout> layouts(fif, descriptorSetLayout);
+    vkx::AllocateDescriptorSets(fif, gp->DescriptorSets.data(), layouts.data());
+
+    return gp;
 }
+
 
 vk::PipelineLayout vkx::CreatePipelineLayout(
     vkx_slice_t<vk::DescriptorSetLayout> setLayouts,
@@ -1000,6 +1010,25 @@ vk::PipelineLayout vkx::CreatePipelineLayout(
 
     return device.createPipelineLayout(layoutInfo, allocator);
 }
+
+
+
+
+//vkx::GraphicsPipeline::GraphicsPipeline(vk::Pipeline pipeline, vk::PipelineLayout pipelineLayout, vk::DescriptorSetLayout descriptorSetLayout, const std::vector<vk::DescriptorSet>& descriptorSets) 
+//    : Pipeline(pipeline), PipelineLayout(pipelineLayout), DescriptorSetLayout(descriptorSetLayout), DescriptorSets(descriptorSets) {}
+
+vkx::GraphicsPipeline::~GraphicsPipeline()
+{
+    VKX_CTX_device_allocator;
+
+    device.destroyPipeline(Pipeline, allocator);
+    device.destroyPipelineLayout(PipelineLayout, allocator);
+
+    device.destroyDescriptorSetLayout(DescriptorSetLayout, allocator);
+}
+
+
+
 
 
 

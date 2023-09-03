@@ -14,8 +14,7 @@
 #include <ethertia/util/Log.h>
 #include <ethertia/util/Loader.h>
 
-static vk::Pipeline g_Pipeline;
-static vk::PipelineLayout g_PipelineLayout;
+static vkx::GraphicsPipeline* g_Pipeline;
 
 static vkx::VertexBuffer* g_VBuffer;
 
@@ -35,9 +34,6 @@ struct PC_A
     glm::mat4 matModel;
 };
 std::vector<vkx::UniformBuffer*> g_ubos;
-std::vector<vk::DescriptorSet> g_DescriptorSets;
-vk::DescriptorSetLayout g_DescriptorSetLayout;
-
 
 vkx::Image* g_Tex;
 
@@ -66,14 +62,6 @@ void RenderEngine::Init()
     g_Tex = vkx::CreateStagedImage(img.width(), img.height(), img.pixels());
 
 
-    g_DescriptorSetLayout = vkx::CreateDescriptorSetLayout(
-    {
-        {vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex},
-        {vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment}
-    });
-
-    g_PipelineLayout = vkx::CreatePipelineLayout(g_DescriptorSetLayout);
-
     g_Pipeline = vkx::CreateGraphicsPipeline(
         {
             {Loader::LoadFile("./shaders/test/vert.spv"), vk::ShaderStageFlagBits::eVertex},
@@ -84,7 +72,11 @@ void RenderEngine::Init()
            vk::Format::eR32G32Sfloat,
            vk::Format::eR32G32B32Sfloat
         },
-        g_PipelineLayout,
+        vkx::CreateDescriptorSetLayout(
+        {
+            {vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex},
+            {vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment}
+        }),
         {},
         vkx::ctx().MainRenderPass, 0);
 
@@ -108,13 +100,10 @@ void RenderEngine::Init()
     
     VKX_LIST_CREATE(g_ubos, vkxc.InflightFrames, vkx::CreateUniformBuffer(sizeof(UBO_A)));
 
-    std::vector<vk::DescriptorSetLayout> layouts(vkxc.InflightFrames, g_DescriptorSetLayout);
-    g_DescriptorSets.resize(vkxc.InflightFrames);
-    vkx::AllocateDescriptorSets(vkxc.InflightFrames, g_DescriptorSets.data(), layouts.data());
 
     for (size_t i = 0; i < vkxc.InflightFrames; i++) 
     {
-        vkx::WriteDescriptorSet(g_DescriptorSets[i],
+        vkx::WriteDescriptorSet(g_Pipeline->DescriptorSets[i],
         {
             { .buffer = vkx::IDescriptorBuffer(g_ubos[i]) },
             { .image  = vkx::IDescriptorImage(g_Tex->imageView) }
@@ -146,8 +135,7 @@ void RenderEngine::Destroy()
 
     device.waitIdle();
 
-    device.destroyPipeline(g_Pipeline, allocator);
-    device.destroyPipelineLayout(g_PipelineLayout, allocator);
+    delete g_Pipeline;
 
     //MaterialTextures::clean();
     //ItemTextures::clean();
@@ -158,7 +146,6 @@ void RenderEngine::Destroy()
     //delete TEX_UVMAP;
 
     VKX_LIST_DELETE(g_ubos);
-    device.destroyDescriptorSetLayout(g_DescriptorSetLayout, allocator);
 
     delete g_VBuffer;
     delete g_Tex;
@@ -211,7 +198,7 @@ void RenderEngine::Render()
 
     vkx::BeginMainRenderPass(cmd);
     {
-        cmd.BindGraphicsPipeline(g_Pipeline);
+        cmd.BindGraphicsPipeline(g_Pipeline->Pipeline);
 
         cmd.SetViewport({}, vkxc.SwapchainExtent);
         cmd.SetScissor({}, vkxc.SwapchainExtent);
@@ -219,7 +206,7 @@ void RenderEngine::Render()
         cmd.BindVertexBuffers(g_VBuffer->vertexBuffer);
         cmd.BindIndexBuffer(g_VBuffer->indexBuffer);
 
-        cmd.cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_PipelineLayout, 0, g_DescriptorSets[fif_i], {});
+        cmd.cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline->PipelineLayout, 0, g_Pipeline->DescriptorSets[fif_i], {});
 
         cmd.DrawIndexed(6);
 

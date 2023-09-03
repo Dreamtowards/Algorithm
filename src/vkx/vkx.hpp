@@ -380,6 +380,33 @@ namespace vkx
 	#pragma region GraphicsPipeline, Descriptor
 
 
+	class GraphicsPipeline
+	{
+	public:
+		vk::Pipeline		Pipeline;
+
+		// Actually these separate vulkan objects can apply on multiple Pipelines instead of just belong to one.
+		// redesign this (seprate them) later when needs.
+
+		// Shader Inputs (DescriptorSetLayouts, PushConstants)
+		// although PipelineLayout is a separate/independent vulkan object, But it is highly related to the pipeline, 
+		// so it is managed together to increase cohesion.
+		vk::PipelineLayout	PipelineLayout;
+
+		// although DescriptorSetLayout is a separate vulkan object, you can use it with multiple pipelines and manage them independently 
+		// for added flexibility, But that will increase the coupling and complexity of the system. so it is managed together to increase cohesion.
+		vk::DescriptorSetLayout DescriptorSetLayout;
+
+		std::vector<vk::DescriptorSet> DescriptorSets;
+
+		//GraphicsPipeline(vk::Pipeline pipeline, vk::PipelineLayout pipelineLayout, vk::DescriptorSetLayout descriptorSetLayout,
+		//	const std::vector<vk::DescriptorSet>& descriptorSets) : Pipeline(pipeline), PipelineLayout(pipelineLayout),
+		//	DescriptorSetLayout(descriptorSetLayout), DescriptorSets(descriptorSets) {}
+
+		~GraphicsPipeline();
+	};
+
+
 	vk::PipelineColorBlendAttachmentState IPipelineColorBlendAttachment(
 		bool blendEnable = true,
 		vk::BlendFactor srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
@@ -401,10 +428,10 @@ namespace vkx
 		std::vector<vk::DynamicState> dynamicStates = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
 	};
 
-	vk::Pipeline CreateGraphicsPipeline(
+	vkx::GraphicsPipeline* CreateGraphicsPipeline(
 		vkx_slice_t<std::pair<std::span<const char>, vk::ShaderStageFlagBits>> shaderStageSources,
 		std::initializer_list<vk::Format> vertexInputAttribFormats,
-		vk::PipelineLayout pipelineLayout,
+		vk::DescriptorSetLayout descriptorSetLayout,
 		FnArg_CreateGraphicsPipeline args = {},
 		vk::RenderPass renderPass = {},
 		uint32_t subpass = 0);
@@ -413,14 +440,6 @@ namespace vkx
 		vkx_slice_t<vk::DescriptorSetLayout> setLayouts,
 		vkx_slice_t<vk::PushConstantRange> pushConstantRanges = {});
 
-
-	class GraphicsPipeline
-	{
-	public:
-		vk::Pipeline		Pipeline;
-		vk::PipelineLayout	PipelineLayout;
-		vk::DescriptorSetLayout DescriptorSetLayout;
-	};
 
 
 	class UniformBuffer
