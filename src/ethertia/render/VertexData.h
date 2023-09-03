@@ -2,9 +2,7 @@
 // Created by Dreamtowards on 2023/3/30.
 //
 
-#ifndef ETHERTIA_VERTEXDATA_H
-#define ETHERTIA_VERTEXDATA_H
-
+#pragma once
 
 #include <vector>
 #include <string>
@@ -35,6 +33,11 @@ public:
     VertexData();
     ~VertexData();
 
+    std::vector<Vertex> Vertices;
+    std::vector<uint32_t> Indices;  // if empty, means vertices are not indexed.
+
+    std::string m_Filename;  // dbg
+
     const void* data() const;  // vtx_data
     size_t size() const;       // vtx_size
 
@@ -53,13 +56,10 @@ public:
     // access vertex. by index if isIndexed(). useful for iteration of {vert(i) : vertexCount()}
     const Vertex& vert(int i) const;
 
-    void addVert(const Vertex& vert);
+    void addVertex(const Vertex& vert);
 
     // make an Unique Indexed VertexData. hash-map method.
-    static VertexData* makeIndexed(const VertexData* nonIndexed);
-
-    std::vector<Vertex> m_Vertices;
-    std::vector<int> m_Indices;  // if empty, means vertices are not indexed.
+    static VertexData* MakeIndexed(const VertexData* nonIndexed);
 
 
     struct VertIter
@@ -81,7 +81,6 @@ public:
     }
 
 
-    std::string m_Filename;  // dbg
 };
 
 
@@ -92,5 +91,3 @@ namespace std {
     };
 }
 
-
-#endif //ETHERTIA_VERTEXDATA_H

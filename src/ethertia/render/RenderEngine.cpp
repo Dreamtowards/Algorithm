@@ -8,6 +8,7 @@
 #include <vkx/vkx.hpp>
 
 #include <ethertia/render/Window.h>
+#include <ethertia/render/VertexData.h>
 #include <ethertia/imgui/Imgui.h>
 #include <ethertia/util/BenchmarkTimer.h>
 #include <ethertia/util/Log.h>
@@ -15,6 +16,9 @@
 
 static vk::Pipeline g_Pipeline;
 static vk::PipelineLayout g_PipelineLayout;
+
+static vk::Buffer g_Buffer;
+vk::DeviceMemory bufMem;
 
 
 
@@ -42,12 +46,21 @@ void RenderEngine::Init()
             {Loader::LoadFile("./shaders/test/frag.spv"), vk::ShaderStageFlagBits::eFragment}
         },
         {
-           //vk::Format::eR32G32B32Sfloat
+           vk::Format::eR32G32B32Sfloat,
+           vk::Format::eR32G32Sfloat,
+           vk::Format::eR32G32B32Sfloat
         },
         g_PipelineLayout,
         {},
         vkx::ctx().MainRenderPass, 0);
 
+    VertexData vtx;
+    vtx.addVertex({ {-0.5, -0.5, 0}, {}, {} });
+    vtx.addVertex({ { 0.5, -0.5, 0}, {}, {} });
+    vtx.addVertex({ { 0.5, 0.5, 0}, {}, {} });
+
+
+    g_Buffer = vkx::CreateStagedBuffer(vtx.vtx_data(), vtx.vtx_size(), bufMem);
 
     //TEX_WHITE = Loader::loadTexture(BitmapImage(1, 1, new uint32_t[1]{(uint32_t)~0}));
     //TEX_UVMAP = Loader::loadTexture("misc/uvmap.png");
@@ -83,6 +96,9 @@ void RenderEngine::Destroy()
     //
     //delete TEX_WHITE;
     //delete TEX_UVMAP;
+
+    device.destroyBuffer(g_Buffer, allocator);
+    device.freeMemory(bufMem, allocator);
 
     Imgui::Destroy();
 
@@ -123,6 +139,8 @@ void RenderEngine::Render()
 
         cmd.SetViewport({}, vkxc.SwapchainExtent);
         cmd.SetScissor({}, vkxc.SwapchainExtent);
+
+        cmd.BindVertexBuffers(g_Buffer);
 
         cmd.Draw(3);
 

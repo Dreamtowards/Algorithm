@@ -35,6 +35,7 @@ uint32_t vkx::FormatSize(vk::Format fmt)
     case vk::Format::eR16G16B16Sfloat:  
         return 6;
     case vk::Format::eR16G16B16A16Sfloat:
+    case vk::Format::eR32G32Sfloat:
         return 8;
     case vk::Format::eR32G32B32Sfloat:    
         return 12;
@@ -56,7 +57,7 @@ uint32_t vkx::FormatSize(vk::Format fmt)
 
 
 
-#pragma region AllocateMemory
+#pragma region AllocateMemory, CreateBuffer, CopyBuffer
 
 static uint32_t _FindMemoryType(uint32_t memTypeFilter, vk::MemoryPropertyFlags memPropertiesFlags)
 {
@@ -72,7 +73,7 @@ static uint32_t _FindMemoryType(uint32_t memTypeFilter, vk::MemoryPropertyFlags 
 
 vk::DeviceMemory vkx::AllocateMemory(
     vk::MemoryRequirements memRequirements,  // size, alignment, memoryType
-    vk::MemoryPropertyFlags memProperties)
+    vk::MemoryPropertyFlags memProperties)   // DEVICE_LOCAL, HOST_VISIABLE, etc..
 {
     VKX_CTX_device_allocator;
 
@@ -83,179 +84,75 @@ vk::DeviceMemory vkx::AllocateMemory(
     return device.allocateMemory(allocInfo, allocator);
 }
 
-#pragma endregion
 
-
-#pragma region CommandBuffer
-
-void vkx::AllocateCommandBuffers(
-    int numCmdbuf,
-    vk::CommandBuffer* pCmdbufs,
-    vk::CommandBufferLevel level,
-    vk::CommandPool commandPool,
-    vk::Device device)
+vk::Buffer vkx::CreateBuffer(
+    VkDeviceSize size,
+    vk::DeviceMemory& out_BufferMemory,
+    vk::BufferUsageFlags usage,
+    vk::MemoryPropertyFlags memProperties)
 {
-    vk::CommandBufferAllocateInfo allocInfo{};
-    allocInfo.commandPool = commandPool;
-    allocInfo.level = level;
-    allocInfo.commandBufferCount = numCmdbuf;
+    VKX_CTX_device_allocator;
 
-    VKX_CHECK(device.allocateCommandBuffers(&allocInfo, pCmdbufs));
+    vk::BufferCreateInfo bufferInfo{};
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+
+    vk::Buffer buffer = device.createBuffer(bufferInfo, allocator);
+
+    vk::MemoryRequirements memRequirements = device.getBufferMemoryRequirements(buffer);
+    out_BufferMemory = vkx::AllocateMemory(memRequirements, memProperties);
+
+    device.bindBufferMemory(buffer, out_BufferMemory, 0);
+
+    return buffer;
 }
 
-void vkx::SubmitCommandBuffer(
-    const std::function<void(vk::CommandBuffer)>& fn_record,
-    vk::Queue queue,
-    vk::CommandPool commandPool,
-    vk::Device device)
+
+void vkx::CopyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size)
 {
-    vk::CommandBuffer cmdbuf;
-    vkx::AllocateCommandBuffers(1, &cmdbuf, vk::CommandBufferLevel::ePrimary);
-
-    cmdbuf.begin(vk::CommandBufferBeginInfo{ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-
-    fn_record(cmdbuf);
-
-    cmdbuf.end();
-
-    vk::SubmitInfo submitInfo{};
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &cmdbuf;
-    queue.submit(submitInfo);
-    queue.waitIdle();
-
-    device.freeCommandBuffers(commandPool, cmdbuf);
+    vkx::SubmitCommandBuffer([=](vk::CommandBuffer cmdbuf)
+    {
+        vk::BufferCopy copyRegion{};
+        copyRegion.size = size;
+        copyRegion.srcOffset = 0;
+        copyRegion.dstOffset = 0;
+        cmdbuf.copyBuffer(srcBuffer, dstBuffer, copyRegion);
+    });
 }
 
 
-void vkx::QueueSubmit(
-    vk::Queue queue, 
-    vkx_slice_t<vk::CommandBuffer> cmdbufs,
-    vkx_slice_t<vk::Semaphore> waits,
-    vkx_slice_t<vk::PipelineStageFlags> waitStages,  // vk::PipelineStageFlagBits::eColorAttachmentOutput
-    vkx_slice_t<vk::Semaphore> signals,
-    vk::Fence fence)
+vk::Buffer vkx::CreateStagedBuffer(
+    const void* bufferData,
+    vk::DeviceSize bufferSize,
+    vk::DeviceMemory& out_BufferMemory,
+    vk::BufferUsageFlags usage)
 {
-    vk::SubmitInfo submitInfo{};
-    submitInfo.commandBufferCount = cmdbufs.size();
-    submitInfo.pCommandBuffers = cmdbufs.data();
+    VKX_CTX_device_allocator;
 
-    assert(waits.size() == waitStages.size());
-    submitInfo.waitSemaphoreCount = waits.size();
-    submitInfo.pWaitSemaphores = waits.data();
-    submitInfo.pWaitDstStageMask = waitStages.data();
+    vk::DeviceMemory stagingBufferMemory;
+    vk::Buffer stagingBuffer = vkx::CreateBuffer(bufferSize, stagingBufferMemory,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-    submitInfo.signalSemaphoreCount = signals.size();
-    submitInfo.pSignalSemaphores = signals.data();
+    void* mapped_dst = device.mapMemory(stagingBufferMemory, 0, bufferSize, (vk::MemoryMapFlagBits)0);
+    std::memcpy(mapped_dst, bufferData, bufferSize);
+    device.unmapMemory(stagingBufferMemory);
 
-    queue.submit(submitInfo, fence);
-}
+    vk::Buffer buffer = vkx::CreateBuffer(bufferSize, out_BufferMemory,
+        vk::BufferUsageFlagBits::eTransferDst | usage,
+        vk::MemoryPropertyFlagBits::eDeviceLocal);
 
+    vkx::CopyBuffer(stagingBuffer, buffer, bufferSize);
 
-vk::Result vkx::QueuePresentKHR(
-    vk::Queue presentQueue,
-    vkx_slice_t<vk::Semaphore> waitSemaphores,
-    vkx_slice_t<vk::SwapchainKHR> swapchains,
-    vkx_slice_t<uint32_t> imageIndices)
-{
-    vk::PresentInfoKHR presentInfo{};
-    presentInfo.waitSemaphoreCount = waitSemaphores.size();
-    presentInfo.pWaitSemaphores = waitSemaphores.data();
-    presentInfo.swapchainCount = swapchains.size();
-    presentInfo.pSwapchains = swapchains.data();
-    presentInfo.pImageIndices = imageIndices.data();
+    device.destroyBuffer(stagingBuffer, allocator);
+    device.freeMemory(stagingBufferMemory, allocator);
 
-    return presentQueue.presentKHR(&presentInfo);
-}
-
-
-vkx::CommandBuffer::CommandBuffer(vk::CommandBuffer cmdbuf) 
-    : cmd(cmdbuf) {}
-
-vkx::CommandBuffer::operator VkCommandBuffer() {
-    return cmd;
-}
-vkx::CommandBuffer::operator vk::CommandBuffer() {
-    return cmd;
-}
-
-void vkx::CommandBuffer::Reset()
-{
-    cmd.reset();
-}
-
-void vkx::CommandBuffer::Begin(vk::CommandBufferUsageFlags usageFlags)
-{
-    vk::CommandBufferBeginInfo beginInfo{ .flags = usageFlags };
-    cmd.begin(beginInfo);
-}
-
-void vkx::CommandBuffer::End()
-{
-    cmd.end();
-}
-
-
-void vkx::CommandBuffer::BeginRenderPass(
-    vk::RenderPass renderPass,
-    vk::Framebuffer framebuffer,
-    vk::Extent2D renderArea,
-    vkx_slice_t<vk::ClearValue> clearValues,
-    vk::SubpassContents subpassContents)
-{
-    vk::RenderPassBeginInfo beginInfo{};
-    beginInfo.renderPass = renderPass;
-    beginInfo.framebuffer = framebuffer;
-    beginInfo.renderArea.offset = { 0, 0 };
-    beginInfo.renderArea.extent = renderArea;
-    beginInfo.clearValueCount = clearValues.size();
-    beginInfo.pClearValues = clearValues.data();
-
-    cmd.beginRenderPass(beginInfo, subpassContents);
-}
-
-void vkx::CommandBuffer::EndRenderPass()
-{
-    cmd.endRenderPass();
-}
-
-void vkx::CommandBuffer::BindGraphicsPipeline(vk::Pipeline graphicsPipeline)
-{
-    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
-}
-
-void vkx::CommandBuffer::SetViewport(
-    vk::Offset2D offset, vk::Extent2D extent,
-    float minDepth, float maxDepth)
-{
-    vk::Viewport viewport{
-       .x = (float)offset.x,
-       .y = (float)offset.y,
-       .width   = (float)extent.width,
-       .height  = (float)extent.height,
-       .minDepth = minDepth,
-       .maxDepth = maxDepth
-    };
-#ifdef VKX_VIEWPORT_NEG_HEIGHT
-    viewport.y = (float)offset.y + (float)extent.height;
-    viewport.height = -(float)extent.height,
-#endif // VKX_VIEWPORT_NEG_HEIGHT
-    cmd.setViewport(0, viewport);
-}
-
-// negative viewport heights?
-void vkx::CommandBuffer::SetScissor(
-    vk::Offset2D offset, vk::Extent2D extent)
-{
-    cmd.setScissor(0, vk::Rect2D{ .offset = offset, .extent = extent });
-}
-
-void vkx::CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
-{
-    cmd.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+    return buffer;
 }
 
 #pragma endregion
+
 
 
 #pragma region Image, ImageView. ImageSampler.
@@ -469,6 +366,188 @@ vkx::Image vkx::CreateDepthImage(int width, int height)
         vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
     return vkx::Image(image, imageMemory, depthFormat, width, height, imageView);
+}
+
+#pragma endregion
+
+
+#pragma region CommandBuffer, QueueSubmit
+
+void vkx::AllocateCommandBuffers(
+    int numCmdbuf,
+    vk::CommandBuffer* pCmdbufs,
+    vk::CommandBufferLevel level,
+    vk::CommandPool commandPool,
+    vk::Device device)
+{
+    vk::CommandBufferAllocateInfo allocInfo{};
+    allocInfo.commandPool = commandPool;
+    allocInfo.level = level;
+    allocInfo.commandBufferCount = numCmdbuf;
+
+    VKX_CHECK(device.allocateCommandBuffers(&allocInfo, pCmdbufs));
+}
+
+void vkx::SubmitCommandBuffer(
+    const std::function<void(vk::CommandBuffer)>& fn_record,
+    vk::Queue queue,
+    vk::CommandPool commandPool,
+    vk::Device device)
+{
+    vk::CommandBuffer cmdbuf;
+    vkx::AllocateCommandBuffers(1, &cmdbuf, vk::CommandBufferLevel::ePrimary);
+
+    cmdbuf.begin(vk::CommandBufferBeginInfo{ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+
+    fn_record(cmdbuf);
+
+    cmdbuf.end();
+
+    vk::SubmitInfo submitInfo{};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdbuf;
+    queue.submit(submitInfo);
+    queue.waitIdle();
+
+    device.freeCommandBuffers(commandPool, cmdbuf);
+}
+
+
+void vkx::QueueSubmit(
+    vk::Queue queue,
+    vkx_slice_t<vk::CommandBuffer> cmdbufs,
+    vkx_slice_t<vk::Semaphore> waits,
+    vkx_slice_t<vk::PipelineStageFlags> waitStages,  // vk::PipelineStageFlagBits::eColorAttachmentOutput
+    vkx_slice_t<vk::Semaphore> signals,
+    vk::Fence fence)
+{
+    vk::SubmitInfo submitInfo{};
+    submitInfo.commandBufferCount = cmdbufs.size();
+    submitInfo.pCommandBuffers = cmdbufs.data();
+
+    assert(waits.size() == waitStages.size());
+    submitInfo.waitSemaphoreCount = waits.size();
+    submitInfo.pWaitSemaphores = waits.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
+
+    submitInfo.signalSemaphoreCount = signals.size();
+    submitInfo.pSignalSemaphores = signals.data();
+
+    queue.submit(submitInfo, fence);
+}
+
+
+vk::Result vkx::QueuePresentKHR(
+    vk::Queue presentQueue,
+    vkx_slice_t<vk::Semaphore> waitSemaphores,
+    vkx_slice_t<vk::SwapchainKHR> swapchains,
+    vkx_slice_t<uint32_t> imageIndices)
+{
+    vk::PresentInfoKHR presentInfo{};
+    presentInfo.waitSemaphoreCount = waitSemaphores.size();
+    presentInfo.pWaitSemaphores = waitSemaphores.data();
+    presentInfo.swapchainCount = swapchains.size();
+    presentInfo.pSwapchains = swapchains.data();
+    presentInfo.pImageIndices = imageIndices.data();
+
+    return presentQueue.presentKHR(&presentInfo);
+}
+
+
+vkx::CommandBuffer::CommandBuffer(vk::CommandBuffer cmdbuf)
+    : cmd(cmdbuf) {}
+
+vkx::CommandBuffer::operator VkCommandBuffer() {
+    return cmd;
+}
+vkx::CommandBuffer::operator vk::CommandBuffer() {
+    return cmd;
+}
+
+void vkx::CommandBuffer::Reset()
+{
+    cmd.reset();
+}
+
+void vkx::CommandBuffer::Begin(vk::CommandBufferUsageFlags usageFlags)
+{
+    vk::CommandBufferBeginInfo beginInfo{ .flags = usageFlags };
+    cmd.begin(beginInfo);
+}
+
+void vkx::CommandBuffer::End()
+{
+    cmd.end();
+}
+
+
+void vkx::CommandBuffer::BeginRenderPass(
+    vk::RenderPass renderPass,
+    vk::Framebuffer framebuffer,
+    vk::Extent2D renderArea,
+    vkx_slice_t<vk::ClearValue> clearValues,
+    vk::SubpassContents subpassContents)
+{
+    vk::RenderPassBeginInfo beginInfo{};
+    beginInfo.renderPass = renderPass;
+    beginInfo.framebuffer = framebuffer;
+    beginInfo.renderArea.offset = { 0, 0 };
+    beginInfo.renderArea.extent = renderArea;
+    beginInfo.clearValueCount = clearValues.size();
+    beginInfo.pClearValues = clearValues.data();
+
+    cmd.beginRenderPass(beginInfo, subpassContents);
+}
+
+void vkx::CommandBuffer::EndRenderPass()
+{
+    cmd.endRenderPass();
+}
+
+void vkx::CommandBuffer::BindGraphicsPipeline(vk::Pipeline graphicsPipeline)
+{
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+}
+
+void vkx::CommandBuffer::SetViewport(
+    vk::Offset2D offset, vk::Extent2D extent,
+    float minDepth, float maxDepth)
+{
+    vk::Viewport viewport{
+       .x = (float)offset.x,
+       .y = (float)offset.y,
+       .width = (float)extent.width,
+       .height = (float)extent.height,
+       .minDepth = minDepth,
+       .maxDepth = maxDepth
+    };
+#ifdef VKX_VIEWPORT_NEG_HEIGHT
+    viewport.y = (float)offset.y + (float)extent.height;
+    viewport.height = -(float)extent.height,
+#endif // VKX_VIEWPORT_NEG_HEIGHT
+        cmd.setViewport(0, viewport);
+}
+
+// negative viewport heights?
+void vkx::CommandBuffer::SetScissor(
+    vk::Offset2D offset, vk::Extent2D extent)
+{
+    cmd.setScissor(0, vk::Rect2D{ .offset = offset, .extent = extent });
+}
+
+void vkx::CommandBuffer::BindVertexBuffers(
+    vkx_slice_t<vk::Buffer> buffers,
+    vkx_slice_t<vk::DeviceSize> offsets,
+    uint32_t firstBinding)
+{
+    static vk::DeviceSize _zeros[8] = {};
+
+    cmd.bindVertexBuffers(firstBinding, buffers, offsets.size() == 0 ? vkx_slice_t{buffers.size(), _zeros} : offsets);
+}
+
+void vkx::CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
+{
+    cmd.draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 #pragma endregion

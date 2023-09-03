@@ -17,7 +17,8 @@
 #define VKX_BACKEND_eGLFW 1
 #define VKX_BACKEND VKX_BACKEND_eGLFW
 
-// works via vkx::CommandBuffer::SetViewport. origin still keep LeftTop (vulkan original). only actually affects gl_Position -> neg .y
+// works via vkx::CommandBuffer::SetViewport. origin still keep LeftTop (vulkan original). 
+// only actually affects { gl_Position.y -> -.y } (y-inversion of the clip-space to framebuffer-space transform.)
 #define VKX_VIEWPORT_NEG_HEIGHT 1
 
 
@@ -170,11 +171,32 @@ namespace vkx
 
 
 
-	#pragma region Memory
+	#pragma region AllocateMemory, CreateBuffer
 
 	vk::DeviceMemory AllocateMemory(
 		vk::MemoryRequirements memRequirements,  // size, alignment, memoryType
 		vk::MemoryPropertyFlags memProperties);
+
+
+	vk::Buffer CreateBuffer(
+		vk::DeviceSize size,
+		vk::DeviceMemory& out_BufferMemory,
+		vk::BufferUsageFlags usage,
+		vk::MemoryPropertyFlags memProperties);
+
+
+	// SubmitCommandBuffer();
+	void CopyBuffer(
+		vk::Buffer srcBuffer,
+		vk::Buffer dstBuffer, 
+		vk::DeviceSize size);
+
+
+	vk::Buffer CreateStagedBuffer(
+		const void* bufferData,
+		vk::DeviceSize bufferSize,
+		vk::DeviceMemory& out_BufferMemory,
+		vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eVertexBuffer);
 
 
 	#pragma endregion
@@ -242,6 +264,8 @@ namespace vkx
 		void SetViewport(vk::Offset2D offset, vk::Extent2D extent, float minDepth = 0.0f, float maxDepth = 1.0f);
 
 		void SetScissor(vk::Offset2D offset, vk::Extent2D extent);
+
+		void BindVertexBuffers(vkx_slice_t<vk::Buffer> buffers, vkx_slice_t<vk::DeviceSize> offsets = {}, uint32_t firstBinding = 0);
 
 		void Draw(uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0);
 
@@ -357,6 +381,14 @@ namespace vkx
 	vk::PipelineLayout CreatePipelineLayout(
 		vkx_slice_t<vk::DescriptorSetLayout> setLayouts,
 		vkx_slice_t<vk::PushConstantRange> pushConstantRanges = {});
+
+
+	class GraphicsPipeline
+	{
+	public:
+		vk::Pipeline		Pipeline;
+		vk::PipelineLayout	PipelineLayout;
+	};
 
 	#pragma endregion
 
