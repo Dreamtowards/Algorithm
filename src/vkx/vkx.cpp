@@ -166,8 +166,8 @@ vk::Buffer vkx::CreateStagedBuffer(
 }
 
 
-vkx::VertexBuffer::VertexBuffer(vk::Buffer vb, vk::DeviceMemory vbm, vk::Buffer ib, vk::DeviceMemory ibm)
-    : vertexBuffer(vb), vertexBufferMemory(vbm), indexBuffer(ib), indexBufferMemory(ibm) {}
+vkx::VertexBuffer::VertexBuffer(vk::Buffer vb, vk::DeviceMemory vbm, vk::Buffer ib, vk::DeviceMemory ibm, uint32_t vcount)
+    : vertexBuffer(vb), vertexBufferMemory(vbm), indexBuffer(ib), indexBufferMemory(ibm), vertexCount(vcount) {}
 
 vkx::VertexBuffer::~VertexBuffer()
 {
@@ -179,21 +179,22 @@ vkx::VertexBuffer::~VertexBuffer()
     device.freeMemory(indexBufferMemory, allocator);
 }
 
-vkx::VertexBuffer* vkx::LoadVertexBuffer(
-    vkx_slice_t<const char> vertices,
-    vkx_slice_t<const char> indices)
-{
-    vk::DeviceMemory vtxmem;
-    vk::Buffer vtxbuf = vkx::CreateStagedBuffer(vertices.data(), vertices.size(), vtxmem, vk::BufferUsageFlagBits::eVertexBuffer);
-
-    vk::DeviceMemory idxmem{};
-    vk::Buffer idxbuf{};
-    if (indices.size())
-    {
-        idxbuf = vkx::CreateStagedBuffer(indices.data(), indices.size(), idxmem, vk::BufferUsageFlagBits::eIndexBuffer);
-    }
-    return new vkx::VertexBuffer(vtxbuf, vtxmem, idxbuf, idxmem);
-}
+//vkx::VertexBuffer* vkx::LoadVertexBuffer(
+//    uint32_t vertexCount,
+//    vkx_slice_t<const char> vertices,
+//    vkx_slice_t<const char> indices)
+//{
+//    vk::DeviceMemory vtxmem;
+//    vk::Buffer vtxbuf = vkx::CreateStagedBuffer(vertices.data(), vertices.size(), vtxmem, vk::BufferUsageFlagBits::eVertexBuffer);
+//
+//    vk::DeviceMemory idxmem{};
+//    vk::Buffer idxbuf{};
+//    if (indices.size() > 0)
+//    {
+//        idxbuf = vkx::CreateStagedBuffer(indices.data(), indices.size(), idxmem, vk::BufferUsageFlagBits::eIndexBuffer);
+//    }
+//    return new vkx::VertexBuffer(vtxbuf, vtxmem, idxbuf, idxmem, vertexCount);
+//}
 
 
 #pragma endregion

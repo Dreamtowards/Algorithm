@@ -213,15 +213,18 @@ namespace vkx
 		vk::DeviceMemory	vertexBufferMemory;
 		vk::Buffer			indexBuffer;
 		vk::DeviceMemory	indexBufferMemory;
+		uint32_t			vertexCount;  // useful when vkCmdDraw()
 
-		VertexBuffer(vk::Buffer vb, vk::DeviceMemory vbm, vk::Buffer ib, vk::DeviceMemory ibm);
+		VertexBuffer(vk::Buffer vb, vk::DeviceMemory vbm, vk::Buffer ib, vk::DeviceMemory ibm, uint32_t vcount);
 
 		~VertexBuffer();
 	};
 
-	vkx::VertexBuffer* LoadVertexBuffer(
-		vkx_slice_t<const char> vertices,
-		vkx_slice_t<const char> indices = {});
+	// way too high-leveled. no reason/usage exists now. (use external loader instead). and should name as LoadVertexData() ?
+	//vkx::VertexBuffer* LoadVertexBuffer(
+	//	uint32_t vertexCount,
+	//	vkx_slice_t<const char> vertices,
+	//	vkx_slice_t<const char> indices = {});
 
 
 	#pragma endregion

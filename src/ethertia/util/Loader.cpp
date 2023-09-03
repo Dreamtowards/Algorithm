@@ -7,8 +7,13 @@
 #include <format>
 #include <fstream>
 #include <filesystem>
+#include <vkx/vkx.hpp>
 
 #include <ethertia/util/Log.h>
+
+
+
+#pragma region File, Asset
 
 
 #define ET_LOADER_LOADINFO 1
@@ -35,9 +40,7 @@ const void* Loader::DataBlock::data() const {
 size_t Loader::DataBlock::size() const {
     return m_Size;
 }
-
-Loader::DataBlock::operator std::span<const char>() const
-{
+Loader::DataBlock::operator std::span<const char>() const {
     return std::span<const char>((const char*)data(), (int)size());
 }
 
@@ -115,6 +118,13 @@ size_t Loader::FileSize(const std::string& path)
     }
 }
 
+
+#pragma endregion
+
+
+#pragma region OBJ
+
+#pragma endregion
 
 /*
 
@@ -255,12 +265,26 @@ void Loader::savePNG(const std::string& filename, const BitmapImage& img)
 
 
 
+*/
 
 
 
 
+vkx::VertexBuffer* Loader::LoadVertexData(const VertexData* vtx)
+{
+    vk::DeviceMemory vtxmem;
+    vk::Buffer vtxbuf = vkx::CreateStagedBuffer(vtx->vtx_data(), vtx->vtx_size(), vtxmem, vk::BufferUsageFlagBits::eVertexBuffer);
 
+    vk::DeviceMemory idxmem{};
+    vk::Buffer idxbuf{};
+    if (vtx->isIndexed())
+    {
+        idxbuf = vkx::CreateStagedBuffer(vtx->idx_data(), vtx->idx_size(), idxmem, vk::BufferUsageFlagBits::eIndexBuffer);
+    }
+    return new vkx::VertexBuffer(vtxbuf, vtxmem, idxbuf, idxmem, vtx->vertexCount());
+}
 
+/*
 
 
 // for OpenGL 3.
@@ -308,27 +332,7 @@ void Loader::savePNG(const std::string& filename, const BitmapImage& img)
 //}
 
 
-
-
-vkx::VertexBuffer* Loader::loadVertexData(const VertexData* vtx)
-{
-    VkBuffer vtxBuffer;
-    VkDeviceMemory vtxMemory;
-    vkx::CreateStagedBuffer(vtx->vtx_data(), vtx->vtx_size(), &vtxBuffer, &vtxMemory, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-    VkBuffer idxBuffer = nullptr;
-    VkDeviceMemory idxMemory = nullptr;
-    if (vtx->isIndexed())
-    {
-        vkx::CreateStagedBuffer(vtx->idx_data(), vtx->idx_size(), &idxBuffer, &idxMemory, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    }
-
-    int vcount = vtx->vertexCount();
-    return new vkx::VertexBuffer(vtxBuffer, vtxMemory, idxBuffer, idxMemory, vcount);
-}
-
-
-
+// GL4.5
 class VertexArray
 {
 public:
@@ -392,6 +396,11 @@ VertexArray* loadVertexData(uint32_t vertexCount, std::initializer_list<int> att
 
 
 */
+
+
+
+
+
 
 vkx::Image* Loader::LoadImage(const BitmapImage& img)
 {

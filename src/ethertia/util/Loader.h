@@ -8,7 +8,7 @@
 
 #include <vkx/vkx.hpp>
 
-//#include <ethertia/render/VertexData.h>
+#include <ethertia/render/VertexData.h>
 #include <ethertia/util/BitmapImage.h>
 
 
@@ -17,8 +17,7 @@ class Loader
 {
 public:
 
-
-    ////////////////// FILE & ASSETS //////////////////
+    #pragma region File & Asset
 
     struct DataBlock
     {
@@ -57,10 +56,11 @@ public:
     // !Heavy IO Cost. recursive calc all file size.
     static size_t FileSize(const std::string& path);
 
+    #pragma endregion
+
+
 
     /*
-
-
 
     ///////////////// OBJ /////////////////
 
@@ -73,14 +73,11 @@ public:
     // quick save for debug, no compression.
     static void saveOBJ(const std::string& filename, size_t verts, const float* pos, const float* uv =nullptr, const float* norm =nullptr);
 
-
-
-
     */
 
-    //////////// PNG ////////////
+    ///////////////// PNG /////////////////
 
-    // todo: return BitmapImage* ptr. for more flexible
+    // todo: ? return BitmapImage* ptr. for more flexible
 
     // internal. stbi_load(filename). load file directly might optimizer than stbi_load_from_memory.
     static BitmapImage LoadPNG_(const char* filename);
@@ -119,36 +116,16 @@ public:
 
 
 
+    */
 
 
 
 
+    // interleaved vertex data. load to GPU, StagedBuffer. 
+    static vkx::VertexBuffer* LoadVertexData(const VertexData* vtx);
 
 
 
-
-
-
-//    static void loadShaderProgram(ShaderProgram* p, const std::string& uri, bool gsh = false)
-//    {
-//        p->load((char*)Loader::loadAssets(Strings::fmt(uri, "vsh")).data(),
-//                (char*)Loader::loadAssets(Strings::fmt(uri, "fsh")).data(),
-//                (char*)(gsh ? Loader::loadAssets(Strings::fmt(uri, "gsh")).data() : nullptr));
-//    }
-
-
-    // load to GPU. interleaved vertex data.
-    static vkx::VertexBuffer* loadVertexData(const VertexData* vtx);
-
-
-
-
-
-    /// pixels_VertFlip: need y/vertical flipped pixels. cause of GL feature.
-//    static vkx::Image* loadTexture(int w, int h, void* pixels_VertFlip,
-//                                int intlfmt = GL_RGBA, int fmt = GL_RGBA, int type = GL_UNSIGNED_BYTE);
-
-*/
     // Image ? Texture
     static vkx::Image* LoadImage(const BitmapImage& img);
 

@@ -107,7 +107,7 @@ void RenderEngine::Init()
     vtx.Indices.push_back(2);
     vtx.Indices.push_back(3);
 
-    g_VBuffer = vkx::LoadVertexBuffer(vtx.vtx_span(), vtx.idx_span());
+    g_VBuffer = Loader::LoadVertexData(&vtx);
 
 
 
