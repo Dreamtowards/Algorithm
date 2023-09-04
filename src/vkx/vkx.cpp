@@ -7,6 +7,9 @@
 #include <cmath>
 
 
+#pragma warning(disable:4267)  // msvc ignore: uint32_t count = (size_t)ls.size();
+
+
 #pragma region base
 
 
@@ -23,8 +26,6 @@ const VkResult& vkx::check(const VkResult& r)
     vkx::check((vk::Result)r);
     return r;
 }
-
-#define VKX_CHECK(result) vkx::check(result)
 
 uint32_t vkx::FormatSize(vk::Format fmt)
 {
@@ -828,8 +829,8 @@ vk::PipelineVertexInputStateCreateInfo IPipelineVertexInputState(
     vk::PipelineVertexInputStateCreateInfo vertexInputState{};
     vertexInputState.vertexBindingDescriptionCount = attribFormats.size() ? 1 : 0;  // if no attribs info, this is an empty vertex input, so set 0.
     vertexInputState.pVertexBindingDescriptions = &bindingDesc;
-    vertexInputState.vertexAttributeDescriptionCount = attribsDesc.size();
-    vertexInputState.pVertexAttributeDescriptions = attribsDesc.data();
+    vertexInputState.vertexAttributeDescriptionCount    = attribsDesc.size();
+    vertexInputState.pVertexAttributeDescriptions       = attribsDesc.data();
 
     return vertexInputState;
 }
@@ -951,7 +952,7 @@ vkx::GraphicsPipeline* vkx::CreateGraphicsPipeline(
 
     vk::PipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.dynamicStateCount = args.dynamicStates.size();
-    dynamicState.pDynamicStates = args.dynamicStates.data();
+    dynamicState.pDynamicStates    = args.dynamicStates.data();
 
 
     vk::PipelineLayout pipelineLayout = vkx::CreatePipelineLayout(descriptorSetLayout);
@@ -1618,7 +1619,7 @@ static void _CreateSwapchain(
 
     // Swapchain ImageViews
     out_SwapchainImageViews.resize(swapchainImageCount);
-    for (int i = 0; i < swapchainImageCount; ++i)
+    for (uint32_t i = 0; i < swapchainImageCount; ++i)
     {
         out_SwapchainImageViews[i] = vkx::CreateImageView(out_SwapchainImages[i], surfaceFormat.format);
     }
@@ -1745,7 +1746,7 @@ void vkx::Destroy()
     VKX_CTX_device_allocator;
 
     //  Destroy SyncObjects
-    for (int i = 0; i < vkxc.InflightFrames; i++) {
+    for (uint32_t i = 0; i < vkxc.InflightFrames; i++) {
         device.destroySemaphore(vkxc.SemaphoreImageAcquired[i],     allocator);
         device.destroySemaphore(vkxc.SemaphoreRenderComplete[i],    allocator);
         device.destroyFence(vkxc.CommandBufferFences[i], allocator);

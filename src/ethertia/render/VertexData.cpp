@@ -2,8 +2,6 @@
 // Created by Dreamtowards on 2023/4/27.
 //
 
-
-
 #include "VertexData.h"
 
 
@@ -41,7 +39,7 @@ std::span<const char> VertexData::idx_span() const
 }
 
 
-size_t VertexData::vertexCount() const
+uint32_t VertexData::vertexCount() const
 {
     return isIndexed() ? Indices.size() : Vertices.size();
 }
@@ -51,7 +49,7 @@ bool VertexData::isIndexed() const
     return !Indices.empty();
 }
 
-const VertexData::Vertex& VertexData::vert(int i) const
+const VertexData::Vertex& VertexData::vert(uint32_t i) const
 {
     return isIndexed() ? Vertices[Indices[i]] : Vertices[i];
 }

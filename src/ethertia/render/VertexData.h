@@ -54,10 +54,10 @@ public:
     bool isIndexed() const;
 
     // all vertices, not just unique vertices number.
-    size_t vertexCount() const;
+    uint32_t vertexCount() const;
 
     // access vertex. by index if isIndexed(). useful for iteration of {vert(i) : vertexCount()}
-    const Vertex& vert(int i) const;
+    const Vertex& vert(uint32_t i) const;
 
     void addVertex(const Vertex& vert);
 
@@ -67,7 +67,7 @@ public:
 
     struct VertIter
     {
-        size_t m_idx;
+        uint32_t m_idx;
         const VertexData* m_vtx;
 
         const Vertex& operator*() const { return m_vtx->vert(m_idx); }

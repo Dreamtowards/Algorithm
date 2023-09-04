@@ -9,6 +9,8 @@
 #define vkx_slice_t vk::ArrayProxy
 #define vkx_optional_t vk::Optional
 
+#define VKX_CHECK(result) vkx::check(result)
+
 #define VKX_CTX_device vk::Device& device = vkx::ctx().Device;
 #define VKX_CTX_device_allocator const vk::Device& device = vkx::ctx().Device; \
     const vk::AllocationCallbacks* allocator = vkx::ctx().Allocator; \
@@ -67,10 +69,10 @@ namespace vkx
 
 	struct QueueFamilyIndices
 	{
-		uint32_t GraphicsFamily = -1;
-		uint32_t PresentFamily = -1;  //Surface Present.
+		uint32_t GraphicsFamily = UINT32_MAX;
+		uint32_t PresentFamily	= UINT32_MAX;  //Surface Present.
 
-		bool isComplete() const { return GraphicsFamily != -1 && PresentFamily != -1; }
+		bool isComplete() const { return GraphicsFamily != UINT32_MAX && PresentFamily != UINT32_MAX; }
 	};
 
 	class InstanceContext

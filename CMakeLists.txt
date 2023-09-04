@@ -14,6 +14,8 @@ set(LIB_DIR "${CMAKE_SOURCE_DIR}/lib")
 
 project(Ethertia)
 
+message("Ethertia CMake G ${CMAKE_GENERATOR}, arch ${CMAKE_SYSTEM_PROCESSOR}, os ${CMAKE_SYSTEM_NAME}")
+
 
 include_directories(src)
 
@@ -66,4 +68,9 @@ target_link_libraries(Ethertia
     "vulkan-1")
 
     
-set_target_properties(Ethertia PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:Ethertia>")
+if (MSVC)
+    target_compile_options(Ethertia PRIVATE 
+        /wd4267  # msvc ignore C4267: implicit conversion possible loss of data e.g. uint32_t count = (size_t)ls.size();
+        /wd4244
+    )
+endif()

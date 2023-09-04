@@ -60,7 +60,11 @@ void RenderEngine::Init()
     VKX_CTX_device_allocator;
 
 
-    g_Tex = Loader::LoadImage("misc/uvmap.png");
+    g_Tex = Loader::LoadImage("viking_room.png");
+
+    g_VBuffer = Loader::LoadVertexData(Loader::LoadOBJ("viking_room.obj"));
+
+
 
     int fif = vkxc.InflightFrames;
 
@@ -90,24 +94,24 @@ void RenderEngine::Init()
         vkx::WriteDescriptorSet(g_Pipeline->DescriptorSets[i],
         {
             {.buffer = vkx::IDescriptorBuffer(g_ubos[i]) },
-            {.image = vkx::IDescriptorImage(g_Tex->imageView) }
+            {.image  = vkx::IDescriptorImage(g_Tex->imageView) }
         });
     }
 
-    VertexData vtx;
-    vtx.addVertex({ {-0.5, -0.5, 0}, {0, 1}, {} });
-    vtx.addVertex({ { 0.5, -0.5, 0}, {1, 1}, {} });
-    vtx.addVertex({ { 0.5,  0.5, 0}, {1, 0}, {} });
-    vtx.addVertex({ {-0.5,  0.5, 0}, {0, 0}, {} });
-
-    vtx.Indices.push_back(0);
-    vtx.Indices.push_back(1);
-    vtx.Indices.push_back(2);
-    vtx.Indices.push_back(0);
-    vtx.Indices.push_back(2);
-    vtx.Indices.push_back(3);
-
-    g_VBuffer = Loader::LoadVertexData(&vtx);
+    //VertexData vtx;
+    //vtx.addVertex({ {-0.5, -0.5, 0}, {0, 1}, {} });
+    //vtx.addVertex({ { 0.5, -0.5, 0}, {1, 1}, {} });
+    //vtx.addVertex({ { 0.5,  0.5, 0}, {1, 0}, {} });
+    //vtx.addVertex({ {-0.5,  0.5, 0}, {0, 0}, {} });
+    //
+    //vtx.Indices.push_back(0);
+    //vtx.Indices.push_back(1);
+    //vtx.Indices.push_back(2);
+    //vtx.Indices.push_back(0);
+    //vtx.Indices.push_back(2);
+    //vtx.Indices.push_back(3);
+    //
+    //g_VBuffer = Loader::LoadVertexData(&vtx);
 
 
 
@@ -184,7 +188,7 @@ void RenderEngine::Render()
 
     {
         // blocking until the CommandBuffer has finished executing
-        device.waitForFences(vkxc.CommandBufferFences[fif_i], true, UINT64_MAX);
+        VKX_CHECK(device.waitForFences(vkxc.CommandBufferFences[fif_i], true, UINT64_MAX));
 
         // acquire swapchain image, and signal SemaphoreImageAcquired[i] when acquired. (when the presentation engine is finished using the image)
         vkxc.CurrentSwapchainImage =

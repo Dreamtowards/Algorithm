@@ -89,7 +89,7 @@ bool Loader::FileExists(const std::string& path)
 const std::string& Loader::Mkdirs(const std::string& path)
 {
     // mkdirs for parents of the file.
-    int _dir = path.rfind('/');
+    size_t _dir = path.rfind('/');
     if (_dir != std::string::npos) {
         std::filesystem::create_directories(path.substr(0, _dir));
     }

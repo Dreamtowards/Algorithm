@@ -89,7 +89,9 @@ public:
     // internal absolute filename. load indexed unique vertices. backend: tiny_obj_loader.
     static VertexData* LoadOBJ_(const char* filename);
 
-    static VertexData* LoadOBJ(const std::string& uri) { return Loader::LoadOBJ_(Loader::FindAsset(uri).c_str()); }
+    static std::shared_ptr<VertexData> LoadOBJ(const std::string& uri) {
+        return std::shared_ptr<VertexData>(Loader::LoadOBJ_(Loader::FindAsset(uri).c_str()));
+    }
 
     // quick save for debug, no compression.
     static void SaveOBJ(const std::string& filename, size_t verts, const float* pos, const float* uv =nullptr, const float* norm =nullptr);
@@ -128,6 +130,7 @@ public:
     // interleaved vertex data. load to GPU, StagedBuffer. 
     static vkx::VertexBuffer* LoadVertexData(const VertexData* vtx);
 
+    static vkx::VertexBuffer* LoadVertexData(std::shared_ptr<VertexData> vtx) { return Loader::LoadVertexData(vtx.get()); }
 
 
     // Image ? Texture
