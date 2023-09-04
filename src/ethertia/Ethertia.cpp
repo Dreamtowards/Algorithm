@@ -10,7 +10,8 @@
 #include <ethertia/imgui/Imgui.h>
 #include <ethertia/util/BenchmarkTimer.h>
 #include <ethertia/util/Log.h>
-#include <ethertia/util/Loader.h>/*
+#include <ethertia/util/Loader.h>
+#include <ethertia/util/Colors.h>/*
 #include <ethertia/world/World.h>
 #include <ethertia/util/Loader.h>
 #include <ethertia/util/Timer.h>

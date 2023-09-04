@@ -122,102 +122,7 @@ size_t Loader::FileSize(const std::string& path)
 #pragma endregion
 
 
-#pragma region OBJ
-
-#pragma endregion
-
-/*
-
-
-
-
-
-
-
-
-
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader/tiny_obj_loader.h>
-
-#include <unordered_map>
-
-
-// Arrays vs Indexed compare for viking_room.obj (Single Vertex is vec3+vec2+vec3 8*f32 = 32 bytes, Index is uint32 = 4 bytes)
-// (arrays: 11484 vert *32 = 367,488 bytes) dbg-run 18ms
-// (indexed: 4725 unique vert *32 = 151,200 bytes (=x0.41) + 11484 indices * 4 = 45,936 bytes  =  197,136 bytes (=x0.54)) dbg-run 21ms
-
-VertexData* Loader::loadOBJ_(const char* filename)
-{
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-
-    std::string err;
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filename)) {
-        throw std::runtime_error(err);
-    }
-    // else if (!err.empty()) { Log::warn("Warn loading .OBJ '{}': {}", filename, err); }
-
-    VertexData* vtx = new VertexData();
-    vtx->m_Filename = filename;
-
-    std::unordered_map<VertexData::Vertex, uint32_t> unique_verts;
-
-    for (tinyobj::shape_t& shape : shapes)
-    {
-        vtx->m_Vertices.reserve(vtx->m_Vertices.size() + shape.mesh.indices.size());
-
-        for (tinyobj::index_t& index : shape.mesh.indices)
-        {
-            glm::vec3 pos = *reinterpret_cast<glm::vec3*>(&attrib.vertices[3*index.vertex_index]);
-            glm::vec2 tex = *reinterpret_cast<glm::vec2*>(&attrib.texcoords[2*index.texcoord_index]);
-            glm::vec3 norm = *reinterpret_cast<glm::vec3*>(&attrib.normals[3*index.normal_index]);
-            VertexData::Vertex vert = {pos, tex, norm};
-
-            // for vulkan y 0=top, while wavefront obj y 0=bottom (opengl like)
-            tex.y = 1.0f - tex.y;
-
-            if (unique_verts.find(vert) == unique_verts.end())
-            {
-                unique_verts[vert] = vtx->m_Vertices.size();
-                vtx->m_Vertices.push_back(vert);
-            }
-            vtx->m_Indices.push_back(unique_verts[vert]);
-        }
-    }
-//#ifdef DATA_INFO
-//    Log::info("Load OBJ {} of {} vertexCount, {} unique vertices ({}% +{}% idx)",
-//              filename, vtx->vertexCount(), vtx->m_Vertices.size(),
-//              (float)vtx->m_Vertices.size()/vtx->vertexCount(),
-//              (float)vtx->m_Indices.size()/vtx->vertexCount()/8.0f);
-//#endif
-    return vtx;
-}
-
-
-
-#include <ethertia/util/OBJLoader.h>
-
-void Loader::saveOBJ(const std::string& filename, size_t verts, const float* pos, const float* uv, const float* norm)
-{
-    std::stringstream ss;
-    OBJLoader::saveOBJ(ss, verts, pos, uv, norm);
-
-    Loader::fileMkdirs(filename);
-    std::ofstream fs(filename);
-    fs << ss.str();
-    fs.close();
-}
-
-
-
-
-
-
-
-
-*/
+#pragma region PNG Load/Save
 
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -240,33 +145,138 @@ BitmapImage Loader::LoadPNG_(const char* filename)
     return BitmapImage(w, h, pixels);
 }
 
-/*
-//BitmapImage Loader::loadPNG(const void* data, size_t len)
-//{
-//    int w, h, channels;
-//    void* pixels = stbi_load_from_memory((unsigned char*)data, len, &w, &h, &channels, 4);
-//
-//    return BitmapImage(w, h, pixels);
-//}
 
-void Loader::savePNG(const std::string& filename, const BitmapImage& img)
+BitmapImage Loader::LoadPNG(const void* data, size_t len)
 {
-    Loader::fileMkdirs(filename);
+    int w, h, channels;
+    void* pixels = stbi_load_from_memory((unsigned char*)data, len, &w, &h, &channels, 4);
+
+    return BitmapImage(w, h, pixels);
+}
+
+void Loader::SavePNG(const std::string& filename, const BitmapImage& img)
+{
+    Loader::Mkdirs(filename);
     if (!stbi_write_png(filename.c_str(), img.width(), img.height(), 4, img.pixels(), 0)) {
         throw std::runtime_error("Failed to write PNG. "+filename);
     }
 }
 
 
+#pragma endregion
+
+
+#pragma region OBJ Load/Save
+
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
+#include <unordered_map>
+
+
+// Arrays vs Indexed compare for viking_room.obj (Single Vertex is vec3+vec2+vec3 8*f32 = 32 bytes, Index is uint32 = 4 bytes)
+// (arrays: 11484 vert *32 = 367,488 bytes) dbg-run 18ms
+// (indexed: 4725 unique vert *32 = 151,200 bytes (=x0.41) + 11484 indices * 4 = 45,936 bytes  =  197,136 bytes (=x0.54)) dbg-run 21ms
+
+VertexData* Loader::LoadOBJ_(const char* filename)
+{
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+
+    std::string err;
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filename)) {
+        throw std::runtime_error(err);
+    }
+    // else if (!err.empty()) { Log::warn("Warn loading .OBJ '{}': {}", filename, err); }
+
+    VertexData* vtx = new VertexData();
+    vtx->m_Filename = filename;
+
+    std::unordered_map<VertexData::Vertex, uint32_t> unique_verts;
+
+    for (tinyobj::shape_t& shape : shapes)
+    {
+        vtx->Vertices.reserve(vtx->Vertices.size() + shape.mesh.indices.size());
+
+        for (tinyobj::index_t& index : shape.mesh.indices)
+        {
+            glm::vec3 pos = *reinterpret_cast<glm::vec3*>(&attrib.vertices[3*index.vertex_index]);
+            glm::vec2 tex = *reinterpret_cast<glm::vec2*>(&attrib.texcoords[2*index.texcoord_index]);
+            glm::vec3 norm = *reinterpret_cast<glm::vec3*>(&attrib.normals[3*index.normal_index]);
+            VertexData::Vertex vert = {pos, tex, norm};
+
+            // for vulkan y 0=top, while wavefront obj y 0=bottom (opengl like)
+            tex.y = 1.0f - tex.y;
+
+            if (unique_verts.find(vert) == unique_verts.end())
+            {
+                unique_verts[vert] = vtx->Vertices.size();
+                vtx->Vertices.push_back(vert);
+            }
+            vtx->Indices.push_back(unique_verts[vert]);
+        }
+    }
+//#ifdef DATA_INFO
+//    Log::info("Load OBJ {} of {} vertexCount, {} unique vertices ({}% +{}% idx)",
+//              filename, vtx->vertexCount(), vtx->m_Vertices.size(),
+//              (float)vtx->m_Vertices.size()/vtx->vertexCount(),
+//              (float)vtx->m_Indices.size()/vtx->vertexCount()/8.0f);
+//#endif
+    return vtx;
+}
 
 
 
 
+static void _SaveOBJ(std::stringstream& out, size_t verts, const float* pos, const float* uv, const float* norm)
+{
+    for (int vi = 0; vi < verts; ++vi) {
+        int _b = vi * 3;
+        out << "v " << pos[_b] << " " << pos[_b + 1] << " " << pos[_b + 2] << "\n";
+    }
+
+    if (uv) {
+        for (int vi = 0; vi < verts; ++vi) {
+            int _b = vi * 2;
+            out << "vt " << uv[_b] << " " << uv[_b + 1] << "\n";
+        }
+    }
+
+    if (norm) {
+        for (int vi = 0; vi < verts; ++vi) {
+            int _b = vi * 3;
+            out << "vn " << norm[_b] << " " << norm[_b + 1] << " " << norm[_b + 2] << "\n";
+        }
+    }
+
+    for (int i = 0; i < verts; i += 3) {
+        const int _i = i + 1; // global index offset 1, obj spec.
+
+        out << "f "
+            << _i << "/" << _i << "/" << _i << " "
+            << _i + 1 << "/" << _i + 1 << "/" << _i + 1 << " "
+            << _i + 2 << "/" << _i + 2 << "/" << _i + 2 << "\n";
+    }
+}
 
 
+void Loader::SaveOBJ(const std::string& filename, size_t verts, const float* pos, const float* uv, const float* norm)
+{
+    std::stringstream ss;
+    _SaveOBJ(ss, verts, pos, uv, norm);
 
-*/
+    Loader::Mkdirs(filename);
+    std::ofstream fs(filename);
+    fs << ss.str();
+    fs.close();
+}
 
+#pragma endregion
+
+
+#pragma region Vulkan: VertexBuffer, Image
 
 
 
@@ -283,6 +293,77 @@ vkx::VertexBuffer* Loader::LoadVertexData(const VertexData* vtx)
     }
     return new vkx::VertexBuffer(vtxbuf, vtxmem, idxbuf, idxmem, vtx->vertexCount());
 }
+
+
+
+vkx::Image* Loader::LoadImage(const BitmapImage& img)
+{
+    return vkx::CreateStagedImage(img.width(), img.height(), img.pixels());
+}
+
+
+/*
+vkx::Image* Loader::loadCubeMap(const BitmapImage* imgs)
+{
+    int w = imgs[0].width();
+    int h = imgs[0].height();
+    VkImage image;
+    VkDeviceMemory imageMemory;
+    VkImageView imageView;
+
+    int singleImageSize = w*h*4;
+    char* pixels = new char[6 * singleImageSize];
+    for (int i = 0; i < 6; ++i) {
+        assert(imgs[i].width() == w && imgs[i].height() == h);
+        std::memcpy(&pixels[i*singleImageSize], imgs[i].pixels(), singleImageSize);
+    }
+
+    vkx::CreateStagedCubemapImage(w, h, pixels, &image, &imageMemory, &imageView);
+
+    return new vkx::Image(image, imageMemory, imageView, w, h);
+}
+
+
+vkx::Image* Loader::loadCubeMap_6(const std::string& filename_pattern, const char** patterns)
+{
+    BitmapImage imgs[6] = {
+            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[0])),  // todo use forloop.
+            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[1])),
+            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[2])),
+            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[3])),
+            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[4])),
+            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[5]))
+    };
+    return Loader::loadCubeMap(imgs);
+}
+
+vkx::Image* Loader::loadCubeMap_3x2(const std::string& filename)
+{
+    BitmapImage comp = Loader::loadPNG(filename);
+    int gsize = comp.height() / 2;
+    assert(std::abs(comp.width() - gsize*3) <= 1 && "expect 3x2 grid image.");
+
+    BitmapImage imgs[6] = {{gsize, gsize}, {gsize, gsize}, {gsize, gsize},
+                           {gsize, gsize}, {gsize, gsize}, {gsize, gsize}};
+
+    glm::vec2 coords[6] = {
+            {2, 1},  // +X Right
+            {0, 1},  // -X Left
+            {1, 0},  // +Y Top
+            {0, 0},  // -Y Bottom
+            {1, 1},  // +Z Front
+            {2, 0}   // -Z Back
+    };
+
+    for (int i = 0; i < 6; ++i) {
+        BitmapImage::CopyPixels(coords[i].x*gsize, coords[i].y*gsize, comp,
+                                0, 0, imgs[i],
+                                gsize, gsize);
+    }
+
+    return Loader::loadCubeMap(imgs);
+}
+
 
 /*
 
@@ -399,78 +480,6 @@ VertexArray* loadVertexData(uint32_t vertexCount, std::initializer_list<int> att
 
 
 
-
-
-
-vkx::Image* Loader::LoadImage(const BitmapImage& img)
-{
-    return vkx::CreateStagedImage(img.width(), img.height(), img.pixels());
-}
-
-
-/*
-vkx::Image* Loader::loadCubeMap(const BitmapImage* imgs)
-{
-    int w = imgs[0].width();
-    int h = imgs[0].height();
-    VkImage image;
-    VkDeviceMemory imageMemory;
-    VkImageView imageView;
-
-    int singleImageSize = w*h*4;
-    char* pixels = new char[6 * singleImageSize];
-    for (int i = 0; i < 6; ++i) {
-        assert(imgs[i].width() == w && imgs[i].height() == h);
-        std::memcpy(&pixels[i*singleImageSize], imgs[i].pixels(), singleImageSize);
-    }
-
-    vkx::CreateStagedCubemapImage(w, h, pixels, &image, &imageMemory, &imageView);
-
-    return new vkx::Image(image, imageMemory, imageView, w, h);
-}
-
-
-vkx::Image* Loader::loadCubeMap_6(const std::string& filename_pattern, const char** patterns)
-{
-    BitmapImage imgs[6] = {
-            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[0])),  // todo use forloop.
-            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[1])),
-            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[2])),
-            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[3])),
-            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[4])),
-            Loader::loadPNG(Strings::fmt(filename_pattern, patterns[5]))
-    };
-    return Loader::loadCubeMap(imgs);
-}
-
-vkx::Image* Loader::loadCubeMap_3x2(const std::string& filename)
-{
-    BitmapImage comp = Loader::loadPNG(filename);
-    int gsize = comp.height() / 2;
-    assert(std::abs(comp.width() - gsize*3) <= 1 && "expect 3x2 grid image.");
-
-    BitmapImage imgs[6] = {{gsize, gsize}, {gsize, gsize}, {gsize, gsize},
-                           {gsize, gsize}, {gsize, gsize}, {gsize, gsize}};
-
-    glm::vec2 coords[6] = {
-            {2, 1},  // +X Right
-            {0, 1},  // -X Left
-            {1, 0},  // +Y Top
-            {0, 0},  // -Y Bottom
-            {1, 1},  // +Z Front
-            {2, 0}   // -Z Back
-    };
-
-    for (int i = 0; i < 6; ++i) {
-        BitmapImage::CopyPixels(coords[i].x*gsize, coords[i].y*gsize, comp,
-                                0, 0, imgs[i],
-                                gsize, gsize);
-    }
-
-    return Loader::loadCubeMap(imgs);
-}
-
-
 //GLuint loadTexture(const BitmapImage& img)
 //{
 //    GLuint texId;
@@ -512,11 +521,6 @@ vkx::Image* Loader::loadCubeMap_3x2(const std::string& filename)
 //
 //    // glGenerateTextureMipmap(texId);
 //}
-
-
-
-
-
 
 
 //Texture* Loader::loadTexture(const BitmapImage& img)
@@ -601,13 +605,12 @@ vkx::Image* Loader::loadCubeMap_3x2(const std::string& filename)
 //}
 
 
+#pragma endregion
 
 
+#pragma region OGG, WAV
 
-
-
-
-
+/*
 
 
 
@@ -681,52 +684,58 @@ void Loader::saveWAV(std::ostream& out, const void* pcm, size_t size, int sample
     out.write((char*)pcm, size);
 }
 
+*/
+#pragma endregion
 
 
+#pragma region FileDialogs, OS
 
 
+#include <tinyfiledialogs.h>
 
 
-
-
-
-
-
-
-#include <tinyfd/tinyfiledialogs.h>
-
-
-void Loader::showMessageBox(const char* title, const char* message)  {
-    tinyfd_messageBox(title, message, "ok", "question", 1);
-}
-
-const char* Loader::showInputBox(const char* title, const char* message, const char* def) {
-    return tinyfd_inputBox(title, message, def);  // free()?
-}
-
-glm::vec3 Loader::openColorPick()  {
-    uint8_t rgb[3] = {};
-    tinyfd_colorChooser("Color Choose", nullptr, rgb, rgb);
-    return {rgb[0] / 255.0f, rgb[1] / 255.0f, rgb[2] / 255.0f};
-}
-
-
-const char* Loader::openFileDialog(const char* title,
-                            const char* defpath,
-                            std::initializer_list<const char*> filepatterns,
-                            const char* desc,
-                            bool allowMultipleFiles)
+void Loader::ShowMessageBox(const char* title, const char* message, const char* dialogType, const char* iconType, int defaultButton)
 {
-    return tinyfd_openFileDialog(title, defpath, filepatterns.size(), filepatterns.begin(), desc, allowMultipleFiles);
+    tinyfd_messageBox(title, message, dialogType, iconType, defaultButton);
 }
 
-const char* Loader::openFolderDialog(const char* title, const char* defpath) {
-    return tinyfd_selectFolderDialog(title, defpath);
+const char* Loader::ShowInputBox(const char* title, const char* message, const char* defaultInput) 
+{
+    return tinyfd_inputBox(title, message, defaultInput);  // free()?
+}
+
+const char* Loader::OpenFileDialog(
+    const char* title, 
+    const char* defaultPath,
+    std::initializer_list<const char*> filterPatterns,
+    const char* filterDesc,
+    bool allowMultipleSelects)
+{
+    return tinyfd_openFileDialog(title, defaultPath, filterPatterns.size(), filterPatterns.begin(), filterDesc, allowMultipleSelects);
+}
+
+const char* Loader::OpenFolderDialog(const char* title, const char* defaultPath) 
+{
+    return tinyfd_selectFolderDialog(title, defaultPath);
+}
+
+glm::vec3 Loader::OpenColorPicker(
+    const char* title,
+    glm::vec3 defaultColor,
+    const char* defaultHexRGB,
+    const char** out_HexRGB) 
+{
+    uint8_t rgb[3] = { defaultColor.x * 255, defaultColor.y * 255, defaultColor.z * 255 };
+    
+    const char* hexResult = tinyfd_colorChooser(title, defaultHexRGB, rgb, rgb);
+    if (out_HexRGB) {
+        *out_HexRGB = hexResult;
+    }
+    return { rgb[0] / 255.0f, rgb[1] / 255.0f, rgb[2] / 255.0f };
 }
 
 
-
-void Loader::openURL(const std::string &url)
+void Loader::OpenURL(const std::string& url)
 {
     const char* cmd = nullptr;
 #if _WIN32
@@ -740,6 +749,32 @@ void Loader::openURL(const std::string &url)
 #endif
     std::system(std::string(cmd + url).c_str());
 }
+
+
+// Test
+//Loader::ShowMessageBox("Title", "Msg");
+//
+//Loader::ShowInputBox("Title", "Msg", "sth");
+//
+//const char* s = Loader::OpenFileDialog("Titlea", nullptr, {}, "Imgs Files", true);
+//if (s) {
+//    Log::info("s: {}", s);
+//    Loader::ShowMessageBox("Title", s, "okcancel", "warning");
+//}
+//
+//s = Loader::OpenFolderDialog("Titlea", "C:/Dev/Algerithm");
+//if (s) {
+//    Log::info("s: {}", s);
+//    Loader::ShowMessageBox("Title", s, "yesno", "error");
+//}
+//
+//Loader::OpenColorPicker("ColPk", Colors::BLUE, nullptr, &s);
+//if (s) {
+//    Log::info("s: {}", s);
+//    Loader::ShowMessageBox("Title", s, "yesnocancel", "question");
+//}
+/*
+
 
 
 
@@ -865,24 +900,26 @@ const char* Loader::cpuid()
 //}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#include <dj-fft/dj_fft.h>
-
-std::vector<std::complex<float>> Loader::fft_1d(const std::vector<std::complex<float>>& freq)
-{
-    return dj::fft1d(freq, dj::fft_dir::DIR_FWD);
-}
 */
+
+#pragma endregion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//#include <dj-fft/dj_fft.h>
+//
+//std::vector<std::complex<float>> Loader::fft_1d(const std::vector<std::complex<float>>& freq)
+//{
+//    return dj::fft1d(freq, dj::fft_dir::DIR_FWD);
+//}

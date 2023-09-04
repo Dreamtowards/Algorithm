@@ -2,8 +2,7 @@
 // Created by Dreamtowards on 2022/4/29.
 //
 
-#ifndef ETHERTIA_COLORS_H
-#define ETHERTIA_COLORS_H
+#pragma once
 
 #include <bit>          // std::endian for some mac platform.
 #include <type_traits>  // std::endian
@@ -50,7 +49,7 @@ public:
         );
     }
 
-    static float parseHex2(const char* hex) {
+    static float ParseHex2(const char* hex) {
         char s[3] = {
                 hex[0],
                 hex[1],
@@ -58,19 +57,19 @@ public:
         };
         return std::stoul(s, nullptr, 16) / 255.0f;
     }
-    static glm::vec3 parseHexRGB(const char* str) {
+    static glm::vec3 ParseHexRGB(const char* str) {
         return {
-            parseHex2(str),
-            parseHex2(str+2),
-            parseHex2(str+4)
+            ParseHex2(str),
+            ParseHex2(str+2),
+            ParseHex2(str+4)
         };
     }
 
-    inline static float luminance(glm::vec3 rgb) {
+    inline static float Luminance(glm::vec3 rgb) {
         return (rgb.x*0.299f + rgb.y*0.587f + rgb.z*0.114f);
     }
 
-    static glm::vec4 brightness(float f) {
+    static glm::vec4 Brightness(float f) {
         return {f, f, f, 1.0};
     }
 
@@ -113,5 +112,3 @@ public:
     inline static const glm::vec4 GOLD       = ofRGB(255, 170, 0);
 
 };
-
-#endif //ETHERTIA_COLORS_H

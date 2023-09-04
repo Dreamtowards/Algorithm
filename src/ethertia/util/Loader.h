@@ -12,7 +12,6 @@
 #include <ethertia/util/BitmapImage.h>
 
 
-
 class Loader
 {
 public:
@@ -50,7 +49,7 @@ public:
 
     static bool FileExists(const std::string& filename);
 
-    // mkdirs for the "dir/" or a file's parent dir "dir/somefile"
+    // mkdirs for the "dir/" (slash required) or a file's parent dir "dir/somefile"
     static const std::string& Mkdirs(const std::string& path);
 
     // !Heavy IO Cost. recursive calc all file size.
@@ -59,44 +58,49 @@ public:
     #pragma endregion
 
 
+    #pragma region PNG, OBJ
 
-    /*
-
-    ///////////////// OBJ /////////////////
-
-
-    // internal absolute filename. load indexed unique vertices. backend: tiny_obj_loader.
-    static VertexData* loadOBJ_(const char* filename);
-
-    static VertexData* loadOBJ(const std::string& uri) { return Loader::loadOBJ_(Loader::fileResolve(uri).c_str()); }
-
-    // quick save for debug, no compression.
-    static void saveOBJ(const std::string& filename, size_t verts, const float* pos, const float* uv =nullptr, const float* norm =nullptr);
-
-    */
 
     ///////////////// PNG /////////////////
 
     // todo: ? return BitmapImage* ptr. for more flexible
 
-    // internal. stbi_load(filename). load file directly might optimizer than stbi_load_from_memory.
+    // stbi_load(filename). load file directly.
     static BitmapImage LoadPNG_(const char* filename);
 
     static BitmapImage LoadPNG(const std::string& uri) { return Loader::LoadPNG_(Loader::FindAsset(uri).c_str()); }
 
 
-    /*
     // stbi_load_from_memory().
-    // static BitmapImage loadPNG(const void* data, size_t len);
+    static BitmapImage LoadPNG(const void* data, size_t len);
 
     // helper func of load_from_memory. allows simply loadPNG(loadFile());
-    // static BitmapImage loadPNG(const DataBlock& m) { return loadPNG(m.data(), m.size()); }
+    static BitmapImage LoadPNG(const DataBlock& m) { return LoadPNG(m.data(), m.size()); }
 
 
 
-    static void savePNG(const std::string& filename, const BitmapImage& img);
+    static void SavePNG(const std::string& filename, const BitmapImage& img);
 
 
+
+    ///////////////// OBJ /////////////////
+
+
+    // internal absolute filename. load indexed unique vertices. backend: tiny_obj_loader.
+    static VertexData* LoadOBJ_(const char* filename);
+
+    static VertexData* LoadOBJ(const std::string& uri) { return Loader::LoadOBJ_(Loader::FindAsset(uri).c_str()); }
+
+    // quick save for debug, no compression.
+    static void SaveOBJ(const std::string& filename, size_t verts, const float* pos, const float* uv =nullptr, const float* norm =nullptr);
+
+
+
+    #pragma endregion
+
+
+    #pragma region OGG, WAV
+    /*
 
     ////////////////// SOUNDS: OGG, WAV //////////////////
 
@@ -113,12 +117,12 @@ public:
     // PCM, 16-bit sample, 1-channel
     static void saveWAV(std::ostream& out, const void* pcm, size_t size, int samplePerSec = 44100);
 
-
-
-
     */
 
+    #pragma endregion
 
+
+    #pragma region Vulkan: VertexBuffer, Image
 
 
     // interleaved vertex data. load to GPU, StagedBuffer. 
@@ -131,6 +135,8 @@ public:
 
     static vkx::Image* LoadImage(const std::string& uri) { return Loader::LoadImage(Loader::LoadPNG(uri)); }
 
+
+    //////////// CUBE MAP IMAGE ////////////
     /*
     // @imgs 6 Images, order: +X Right, -X Left, +Y Top, -Y Bottom, +Z Front, -Z Back.
     static vkx::Image* loadCubeMap(const BitmapImage* imgs);
@@ -145,60 +151,59 @@ public:
     // load a 3x2 grid image, first row: bottom, top, back, second row: left front, right
     static vkx::Image* loadCubeMap_3x2(const std::string& filename);
 
-
-//    // imgs order: Right, Left, Top, Bottom, Front, Back.
-//    static Texture* loadCubeMap(const BitmapImage imgs[]);
-//
-//    // a 3x2 grid png. first row: bottom, top, back, second row: left front, right
-//    static Texture* loadCubeMap_3x2(const std::string& filepath);
-//
-//    // filepath: a pattern e.g. "skybox-{}.png", the {} would be replaced with "right/left/top/bottom/front/back".
-//    static Texture* loadCubeMap_6(const std::string& filepath) {
-//        BitmapImage imgs[] = {
-//                Loader::loadPNG(Strings::fmt(filepath, "right")),
-//                Loader::loadPNG(Strings::fmt(filepath, "left")),
-//                Loader::loadPNG(Strings::fmt(filepath, "top")),
-//                Loader::loadPNG(Strings::fmt(filepath, "bottom")),
-//                Loader::loadPNG(Strings::fmt(filepath, "front")),
-//                Loader::loadPNG(Strings::fmt(filepath, "back")),
-//        };
-//        return loadCubeMap(imgs);
-//    }
+    */
+    #pragma endregion
 
 
+    #pragma region FileDialog, OS
 
 
+    ///////////// FileDialogs /////////////
 
 
+    static void ShowMessageBox(
+        const char* title,              // nullable
+        const char* message,            // nullable
+        const char* dialogType = "ok",  // "ok" "okcancel" "yesno" "yesnocancel"
+        const char* iconType = "info",  // "info" "warning" "error" "question"
+        int defaultButton = 1);         // 0 for cancel/no , 1 for ok/yes , 2 for no in yesnocancel
+
+    // returns NULL on cancel
+    static const char* ShowInputBox(
+        const char* title, 
+        const char* message,
+        const char* defaultInput = "");  // if NULL it's a passwordBox
 
 
+    // in case of multiple files, the separator is |
+    static const char* OpenFileDialog(
+        const char* title = nullptr,
+        const char* defaultPath = nullptr,
+        std::initializer_list<const char*> filterPatterns = {},  // NULL or {"*.jpg","*.png"}
+        const char* filterDesc = nullptr,                        // NULL or "image files"
+        bool allowMultipleSelects = false);
+
+    static const char* OpenFolderDialog(const char* title = "", const char* defaultPath = "");
 
 
-
+    static glm::vec3 OpenColorPicker(
+        const char* title,
+        glm::vec3 defaultColor,
+        const char* defaultHexRGB = nullptr,  // NULL or "#FF0000"
+        const char** out_HexRGB = nullptr);   // result e.g. "#FF0000"
 
 
 
     ///////////// OS /////////////
 
 
-    static void showMessageBox(const char* title, const char* message);
 
-    static const char* showInputBox(const char* title, const char* message, const char* def);
-
-    static const char* openFileDialog(const char* title = nullptr,
-                               const char* defpath = nullptr,
-                               std::initializer_list<const char*> filepatterns = {},
-                               const char* desc = nullptr,
-                               bool allowMultipleFiles = false);
-
-    static const char* openFolderDialog(const char* title = "", const char* defpath = "");
-
-    static glm::vec3 openColorPick();
+    // open File, Folder, Website URL
+    static void OpenURL(const std::string& url);
 
 
-
-    // open File, Folder, URL
-    static void openURL(const std::string& url);
+    /*
+    static const char* cpuid();
 
 
     // macOS:   darwin-x64  | darwin-arm64
@@ -216,7 +221,6 @@ public:
     // Windows: lib<Name>.dll
     // static std::string sys_libname(const std::string& name);
 
-    static const char* cpuid();
 
 
     ////////////// Misc //////////////
@@ -224,5 +228,9 @@ public:
 
     static std::vector<std::complex<float>> fft_1d(const std::vector<std::complex<float>>& data);
     */
+
+    #pragma endregion
+
+
 };
 
