@@ -33,9 +33,9 @@ struct PC_A
 {
     glm::mat4 matModel;
 };
-std::vector<vkx::UniformBuffer*> g_ubos;
+static std::vector<vkx::UniformBuffer*> g_ubos;
 
-vkx::Image* g_Tex;
+static vkx::Image* g_Tex;
 
 #define VKX_LIST_CREATE(ls, n, init) ls.resize(n); for (int _i = 0; _i < n; ++_i) { ls[_i] = init; }
 #define VKX_LIST_DELETE(ls) for (int _i = 0; _i < ls.size(); ++_i) { delete ls[_i]; }
@@ -55,7 +55,6 @@ void RenderEngine::Init()
         VK_API_VERSION_MAJOR(vkApiVersion), VK_API_VERSION_MINOR(vkApiVersion), VK_API_VERSION_PATCH(vkApiVersion),
         (const char*)vkx::ctx().PhysDeviceProperties.deviceName);
 
-    Imgui::Init();
 
     VKX_CTX_device_allocator;
 
@@ -97,6 +96,8 @@ void RenderEngine::Init()
             {.image  = vkx::IDescriptorImage(g_Tex->imageView) }
         });
     }
+
+    Imgui::Init();
 
     //VertexData vtx;
     //vtx.addVertex({ {-0.5, -0.5, 0}, {0, 1}, {} });
@@ -207,7 +208,7 @@ public:
         matView   = glm::lookAt(position, position + direction, glm::vec3(0.0f, 1.0f, 0.0f));
     }
 };
-Camera g_MainCamera;
+static Camera g_MainCamera;
 
 #include <ethertia/imgui/ImWindows.h>
 
@@ -224,6 +225,21 @@ void ShowSomeWindow(bool* show)
 void RenderEngine::Render()
 {
     Imgui::NewFrame();
+
+
+    {
+        ImWindows::ShowWindows();
+
+        ImGui::Begin("TmpDebug222");
+        if (ImGui::Button("ShowTheWiin"))
+        {
+            ImWindows::Show(ShowSomeWindow);
+        }
+        ImGui::End();
+
+
+
+    }
 
     if (Window::IsFramebufferResized())
         vkx::RecreateSwapchain();  // fix: Minimize size0
@@ -265,31 +281,19 @@ void RenderEngine::Render()
         cmd.Reset();
         cmd.Begin(vk::CommandBufferUsageFlagBits::eSimultaneousUse);
     }
-    {
-        ImGui::Begin("TmpDebug222");
-        if (ImGui::Button("ShowTheWiin"))
-        {
-            ImWindows::Show(ShowSomeWindow);
-        }
-        ImGui::End();
-
-
-        ImWindows::ShowWindows();
-
-    }
     vkx::BeginMainRenderPass(cmd);
     {
-        cmd.BindGraphicsPipeline(g_Pipeline->Pipeline);
-
-        cmd.SetViewport({}, vkxc.SwapchainExtent);
-        cmd.SetScissor({}, vkxc.SwapchainExtent);
-
-        cmd.BindVertexBuffers(g_VBuffer->vertexBuffer);
-        cmd.BindIndexBuffer(g_VBuffer->indexBuffer);
-
-        cmd.cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline->PipelineLayout, 0, g_Pipeline->DescriptorSets[fif_i], {});
-
-        cmd.DrawIndexed(g_VBuffer->vertexCount);
+        //cmd.BindGraphicsPipeline(g_Pipeline->Pipeline);
+        //
+        //cmd.SetViewport({}, vkxc.SwapchainExtent);
+        //cmd.SetScissor({}, vkxc.SwapchainExtent);
+        //
+        //cmd.BindVertexBuffers(g_VBuffer->vertexBuffer);
+        //cmd.BindIndexBuffer(g_VBuffer->indexBuffer);
+        //
+        //cmd.cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline->PipelineLayout, 0, g_Pipeline->DescriptorSets[fif_i], {});
+        //
+        //cmd.DrawIndexed(g_VBuffer->vertexCount);
 
         Imgui::Render(cmd);
 

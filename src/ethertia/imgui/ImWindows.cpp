@@ -220,14 +220,7 @@ static void ShowMainMenuBar()
 
             if (ImGui::BeginMenu("Debug"))
             {
-                bool show = ImWindows::Has(ImGui::ShowDemoWindow);
-                if (ImGui::Checkbox("ImGui DemoWindow", &show)) {
-                    if (show) {
-                        ImWindows::Show(ImGui::ShowDemoWindow);
-                    } else {
-                        ImWindows::Erase(ImGui::ShowDemoWindow);
-                    }
-                }
+                ImWindows::Checkbox("ImGui DemoWindow", ImGui::ShowDemoWindow);
 
                 ImGui::EndMenu();
             }
@@ -319,26 +312,6 @@ static void ShowDockspaceAndMainMenubar()
 
 
 
-namespace ImInspector
-{
-    void* Inspecting = nullptr;
-
-    void ShowInspector()
-    {
-        ImGui::Begin("Inspector");
-
-
-
-        ImGui::End();
-    }
-
-    void InspCamera()
-    {
-
-    }
-
-};
-
 #include <stdx/stdx.h>
 
 #include <ethertia/util/Log.h>
@@ -358,7 +331,7 @@ bool ImWindows::Has(FuncPtr w)
     return stdx::exists(ImWindows::Windows, w);  //auto& ls = ImWindows::Windows;std::find(ls.begin(), ls.end(), w) != ls.end();
 }
 
-void ImWindows::Erase(FuncPtr w)
+void ImWindows::Close(FuncPtr w)
 {
     stdx::erase(ImWindows::Windows, w);
 }
@@ -380,3 +353,48 @@ void ImWindows::ShowWindows()
         }
     }
 }
+
+void ImWindows::Checkbox(const char* label, FuncPtr w)
+{
+    bool show = ImWindows::Has(w);
+    if (ImGui::Checkbox("ImGui DemoWindow", &show)) 
+    {
+        if (show) {
+            ImWindows::Show(w);
+        } else {
+            ImWindows::Close(w);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+namespace ImInspector
+{
+    void* Inspecting = nullptr;
+
+    void ShowInspector()
+    {
+        ImGui::Begin("Inspector");
+
+
+
+        ImGui::End();
+    }
+
+    void InspCamera()
+    {
+
+    }
+
+};

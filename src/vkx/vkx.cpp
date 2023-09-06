@@ -1526,22 +1526,23 @@ static vk::RenderPass _CreateMainRenderPass(
     vk::SubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests;
-    dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests;
+    dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;// | vk::PipelineStageFlagBits::eEarlyFragmentTests;
+    dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;// | vk::PipelineStageFlagBits::eEarlyFragmentTests;
     dependency.srcAccessMask = vk::AccessFlagBits::eNone;
-    dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+    dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;// | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
 
-    vk::AttachmentReference colorAttachmentRef = { 0, vk::ImageLayout::eColorAttachmentOptimal };
-    vk::AttachmentReference depthAttachmentRef = { 1, vk::ImageLayout::eDepthStencilAttachmentOptimal };
+//    vk::AttachmentReference colorAttachmentRef = { 0, vk::ImageLayout::eColorAttachmentOptimal };
+//    vk::AttachmentReference depthAttachmentRef = { 1, vk::ImageLayout::eDepthStencilAttachmentOptimal };
 
     return vkx::CreateRenderPass(
-        {{
-            vkx::IAttachmentDesc(imageFormat, vk::ImageLayout::ePresentSrcKHR),
-            vkx::IAttachmentDesc(depthFormat, vk::ImageLayout::eDepthStencilAttachmentOptimal)
-        }},
+        {
+            vkx::IAttachmentDesc(imageFormat, vk::ImageLayout::ePresentSrcKHR)//,
+            //vkx::IAttachmentDesc(depthFormat, vk::ImageLayout::eDepthStencilAttachmentOptimal)
+        },
         vkx::IGraphicsSubpass(
-            vkx::IAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal),           // Color
-            vkx::IAttachmentRef(1, vk::ImageLayout::eDepthStencilAttachmentOptimal)),   // Depth
+            vkx::IAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal)//,           // Color
+            //vkx::IAttachmentRef(1, vk::ImageLayout::eDepthStencilAttachmentOptimal)
+            ),   // Depth
         dependency);
 }
 
@@ -1571,12 +1572,12 @@ static void _CreateSwapchain(
     assert(surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max() && "VkxError: invalid VkSurfaceCapabilitiesKHR.currentExtent.width");
     
     vk::PresentModeKHR surfacePresentMode = vk::PresentModeKHR::eFifo;  // FIFO is vk guaranteed available.
-    {
-        for (auto mode : physDevice.getSurfacePresentModesKHR(surfaceKHR)) {
-            if (mode == vk::PresentModeKHR::eMailbox) // MAILBOX avoid tearing while still maintaining a fairly low latency by rendering new images that are as up-to-date as possible right until the vertical blank.
-                surfacePresentMode = vk::PresentModeKHR::eMailbox;
-        }
-    }
+//    {
+//        for (auto mode : physDevice.getSurfacePresentModesKHR(surfaceKHR)) {
+//            if (mode == vk::PresentModeKHR::eMailbox) // MAILBOX avoid tearing while still maintaining a fairly low latency by rendering new images that are as up-to-date as possible right until the vertical blank.
+//                surfacePresentMode = vk::PresentModeKHR::eMailbox;
+//        }
+//    }
 
     uint32_t swapchainImageCount = surfaceCapabilities.minImageCount + 1;
     if (surfaceCapabilities.maxImageCount > 0 && swapchainImageCount > surfaceCapabilities.maxImageCount) {
@@ -1629,7 +1630,7 @@ static void _CreateSwapchain(
     for (size_t i = 0; i < swapchainImageCount; i++)
     {
         out_SwapchainFramebuffers[i] = vkx::CreateFramebuffer(out_SwapchainExtent, renderPass,
-            { { out_SwapchainImageViews[i], out_SwapchainDepthImage->imageView } });
+            { out_SwapchainImageViews[i] /*, out_SwapchainDepthImage->imageView */});
     }
 }
 
@@ -1728,7 +1729,8 @@ void vkx::Init(
     _CreateCommandBuffers();
 
     // dependent by CreateMainRenderPass
-    i.SwapchainSurfaceFormat = i.PhysDevice.getSurfaceFormatsKHR(i.SurfaceKHR).front();  // expected: {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}
+    // auto surfaceFormats = i.PhysDevice.getSurfaceFormatsKHR(i.SurfaceKHR).front();
+    i.SwapchainSurfaceFormat = { vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear };
     i.SwapchainDepthImageFormat = _FindDepthFormat();
 
     // dependent by CreateSwapchinFramebuffers

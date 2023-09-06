@@ -31,6 +31,14 @@ include_directories(lib/fastnoise2-0.10.0a/include)
 include_directories(lib/tinyobjloader-1.0.6/include)
 include_directories(lib/json11-1.0.0/include)
 
+#set(GLFW_BUILD_EXAMPLES ON)
+#add_subdirectory(lib/glfw-3.3.8)
+
+set(Vulkan_LIBRARY "C:/Softwares/VulkanSDK/1.3.250.0/Lib/vulkan-1.lib")
+set(Vulkan_INCLUDE_DIR "C:/Softwares/VulkanSDK/1.3.250.0/Include")
+
+
+add_subdirectory(lib/imgui-docking-1.89.9/examples/example_glfw_vulkan)
 
 add_executable(Ethertia
     src/vkx/vkx.cpp

@@ -4,5 +4,21 @@
       "out\\build\\x64-Debug",
       "out\\install\\x64-Debug"
     ]
-  }
+  },
+  "ExpandedNodes": [
+    "",
+    "\\lib",
+    "\\lib\\imgui-docking-1.89.9",
+    "\\lib\\imgui-docking-1.89.9\\examples",
+    "\\lib\\imgui-docking-1.89.9\\examples\\example_glfw_vulkan",
+    "\\lib\\_misc",
+    "\\lib\\_misc\\imgui",
+    "\\lib\\_misc\\imgui-docking-1.89.4-edit",
+    "\\lib\\_misc\\imgui-docking-1.89.4-edit\\examples",
+    "\\lib\\_misc\\imgui-docking-1.89.4-edit\\examples\\example_glfw_vulkan",
+    "\\lib\\_misc\\imgui\\examples",
+    "\\lib\\_misc\\imgui\\examples\\example_glfw_opengl3"
+  ],
+  "SelectedNode": "\\lib\\_misc\\imgui\\examples\\example_glfw_opengl3\\example_glfw_opengl3.vcxproj",
+  "PreviewInSolutionExplorer": false
 }

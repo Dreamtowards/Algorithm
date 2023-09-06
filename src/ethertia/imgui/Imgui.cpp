@@ -22,20 +22,20 @@ static void InitForVulkan()
 {
     ImGui_ImplGlfw_InitForVulkan(Window::Handle(), true);
 
-    auto& vkxc = vkx::ctx();
-    ImGui_ImplVulkan_InitInfo initInfo = {};
+    VKX_CTX_device_allocator;
+    ImGui_ImplVulkan_InitInfo initInfo{};
     initInfo.Instance = vkxc.Instance;
     initInfo.PhysicalDevice = vkxc.PhysDevice;
     initInfo.Device = vkxc.Device;
-    //initInfo.QueueFamily = vkxc.QueueFamily.GraphicsFamily;
+    initInfo.QueueFamily = vkxc.QueueFamily.GraphicsFamily;
     initInfo.Queue = vkxc.GraphicsQueue;
     initInfo.PipelineCache = nullptr;
     initInfo.DescriptorPool = vkxc.DescriptorPool;
     initInfo.Subpass = 0;
-    initInfo.MinImageCount = 3;
-    initInfo.ImageCount = 3;
+    initInfo.MinImageCount = 2;
+    initInfo.ImageCount = vkxc.SwapchainImages.size();
     initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    //init_info.Allocator = g_Allocator;
+    initInfo.Allocator = (VkAllocationCallbacks*)vkxc.Allocator;
     initInfo.CheckVkResultFn = ImplImgui_VulkanCheckResult;
 
     // Dynamic Rendering, VK_KHR_dynamic_rendering
@@ -63,9 +63,22 @@ void Imgui::Init()
     ImGui::StyleColorsDark();
     // InitStyle();
 
-    InitForVulkan();
 
     ImGuiIO& io = ImGui::GetIO();
+
+    // Set Before Backend/Impl Init.
+    io.ConfigFlags |=
+        ImGuiConfigFlags_DockingEnable |    // Enable Docking.
+        ImGuiConfigFlags_ViewportsEnable;   // Multiple Windows/Viewports
+        ImGuiConfigFlags_DpiEnableScaleFonts |
+        ImGuiConfigFlags_DpiEnableScaleViewports;
+    //io.ConfigViewportsNoDecoration = false;
+    //io.ConfigViewportsNoTaskBarIcon = true;
+    //ImGui::GetMainViewport()->DpiScale = 4;
+
+    InitForVulkan();
+
+
 
     // ImNodes
     //ImNodes::CreateContext();
@@ -84,8 +97,8 @@ void Imgui::Destroy()
 
 void Imgui::NewFrame()
 {
-    ImGui_ImplGlfw_NewFrame();
     ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
     //ImGui_ImplGlfw_MousePosWindowScale = 1.0f / Imgui::GlobalScale;
@@ -105,10 +118,10 @@ void Imgui::Render(vk::CommandBuffer cmdbuf)
     // Update Multiple Windows/Viewports
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
-        GLFWwindow* backup_current_context = glfwGetCurrentContext();
+        //GLFWwindow* backup_current_context = glfwGetCurrentContext();
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(backup_current_context);
+        //glfwMakeContextCurrent(backup_current_context);
     }
 }
 

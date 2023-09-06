@@ -3,7 +3,6 @@
 #pragma once
 
 #include <vector>
-#include <functional>
 
 
 class ImWindows
@@ -16,24 +15,24 @@ public:
 
 	static bool Has(FuncPtr w);
 
-	static void Erase(FuncPtr w);
+	static void Close(FuncPtr w);
 
 	static void ShowWindows();
 
+	// ToggleWindow
+	static void Checkbox(const char* label, FuncPtr w);
 
-	class Inspector
+
+	struct Inspector
 	{
-	public:
-		inline static bool
-			ShowInspector = true, 
-			ShowEntityList = false;
+		inline static void* Inspecting = nullptr;
+
+		static void ShowInspector();
 	};
 
-	class Debug
+	struct Settings
 	{
-	public:
-		inline static bool
-			ShowImGuiDemoWindow = false;
+
 	};
 
 };
