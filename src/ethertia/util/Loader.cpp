@@ -218,12 +218,12 @@ VertexData* Loader::LoadOBJ_(const char* filename)
             vtx->Indices.push_back(unique_verts[vert]);
         }
     }
-//#ifdef DATA_INFO
-//    Log::info("Load OBJ {} of {} vertexCount, {} unique vertices ({}% +{}% idx)",
-//              filename, vtx->vertexCount(), vtx->m_Vertices.size(),
-//              (float)vtx->m_Vertices.size()/vtx->vertexCount(),
-//              (float)vtx->m_Indices.size()/vtx->vertexCount()/8.0f);
-//#endif
+#ifdef ET_LOADER_LOADINFO
+    Log::info("Load OBJ {}. VertexCount={}, VerticesTable={}. (vertices reduced to {}%, by additional {}% indices)",
+              filename, vtx->vertexCount(), vtx->Vertices.size(),
+              (float)vtx->Vertices.size()/vtx->vertexCount(),
+              (float)vtx->Indices.size()/vtx->vertexCount()*((float)sizeof(uint32_t) / sizeof(VertexData::Vertex)));
+#endif
     return vtx;
 }
 

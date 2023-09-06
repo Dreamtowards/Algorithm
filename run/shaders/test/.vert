@@ -18,9 +18,9 @@ vec3 color[4] = vec3[](
 );
 
 layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
-    mat4 view;
     mat4 proj;
+    mat4 view;
+    mat4 model;
     float Time;
 } ubo;
 
@@ -29,7 +29,7 @@ layout(location = 1) out vec2 out_uv;
 
 void main() 
 {
-    out_uv = in_uv;
+    out_uv = vec2(in_uv.x, 1.0 - in_uv.y);
     out_Pos = color[gl_VertexIndex] * cos(ubo.Time) * 0.5 + 0.5;
-    gl_Position = vec4(in_pos, 1.0);
+    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(in_pos, 1.0);
 }

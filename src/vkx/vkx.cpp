@@ -7,9 +7,6 @@
 #include <cmath>
 
 
-#pragma warning(disable:4267)  // msvc ignore: uint32_t count = (size_t)ls.size();
-
-
 #pragma region base
 
 

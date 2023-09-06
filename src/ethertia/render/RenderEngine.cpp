@@ -60,10 +60,10 @@ void RenderEngine::Init()
     VKX_CTX_device_allocator;
 
 
-    g_Tex = Loader::LoadImage("viking_room.png");
+    g_Tex = Loader::LoadImage("entity/gravestone/diff.png");
 
-    g_VBuffer = Loader::LoadVertexData(Loader::LoadOBJ("viking_room.obj"));
 
+    g_VBuffer = Loader::LoadVertexData(Loader::LoadOBJ("entity/gravestone/mesh.obj"));
 
 
     int fif = vkxc.InflightFrames;
@@ -110,7 +110,7 @@ void RenderEngine::Init()
     //vtx.Indices.push_back(0);
     //vtx.Indices.push_back(2);
     //vtx.Indices.push_back(3);
-    //
+    
     //g_VBuffer = Loader::LoadVertexData(&vtx);
 
 
@@ -158,15 +158,75 @@ void RenderEngine::Destroy()
 
     vkx::Destroy();
 }
+static glm::vec3 CamPos{0, 0, 10};
 
+static glm::mat4 matModel(glm::vec3 position, glm::mat3 rotation, glm::vec3 scale) {
+    glm::mat4 mat{ 1 };
 
+    mat = glm::translate(mat, position);
+
+    mat = mat * glm::mat4(rotation);
+
+    mat = glm::scale(mat, scale);
+
+    return mat;
+}
+
+class Camera
+{
+public:
+
+    glm::vec3 position;
+
+    glm::vec3 eulerangles;
+
+    // readonly
+    glm::vec3 direction;
+
+    glm::vec3 pivot;
+    float PivotDistance = 0;
+
+    float fov = glm::radians(80.0f);
+    float RatioAspect = 1.0f;
+    float NearPlane = 0.1f;
+    float FarPlane = 10000.0f;
+
+    glm::mat4 matProjection;
+    glm::mat4 matView;
+
+    void UpdateMatrix()
+    {
+        float pitch = eulerangles.x;
+        direction.y = sin(pitch);
+
+        float yaw = eulerangles.y;
+        direction.x = cos(yaw); // Note that we convert the angle to radians first
+        direction.z = sin(yaw);
+
+        matProjection = glm::perspective(fov, RatioAspect, NearPlane, FarPlane);
+        matView   = glm::lookAt(position, position + direction, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+};
+Camera g_MainCamera;
+
+#include <ethertia/imgui/ImWindows.h>
+
+void ShowSomeWindow(bool* show)
+{
+    ImGui::Begin("TmpDebug", show);
+    Camera& cam = g_MainCamera;
+    ImGui::DragFloat3("Position", &cam.position.x);
+    ImGui::DragFloat3("EulerAngles\n(Pitch, Yaw, Roll)", &cam.eulerangles.x, 0.05);
+    ImGui::DragFloat("Fov", &cam.fov, 0.05);
+    ImGui::End();
+}
 
 void RenderEngine::Render()
 {
     Imgui::NewFrame();
 
     if (Window::IsFramebufferResized())
-        vkx::RecreateSwapchain();
+        vkx::RecreateSwapchain();  // fix: Minimize size0
 
     VKX_CTX_device_allocator;
 
@@ -174,13 +234,19 @@ void RenderEngine::Render()
     vkx::CommandBuffer cmd{ vkxc.CommandBuffers[fif_i] };
 
     {
+
         float t = Window::PreciseTime();
 
+        glm::vec2 dMouse = Window::MouseDelta();
+        //g_MainCamera.eulerangles.x += dMouse.y;
+        //g_MainCamera.eulerangles.y += dMouse.x;
+
+        g_MainCamera.UpdateMatrix();
+
         UBO_A ubo;
-        ubo.matProjection = glm::perspective(glm::radians(45.0f), vkxc.SwapchainExtent.width/(float)vkxc.SwapchainExtent.height, 
-            0.1f, 1000.0f);
-        ubo.matView = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.matModel = glm::rotate(glm::mat4(1.0f), t * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.matProjection = g_MainCamera.matProjection;// glm::perspective(glm::radians(80.0f), vkxc.SwapchainExtent.width / (float)vkxc.SwapchainExtent.height, 0.1f, 1000.0f);
+        ubo.matView = g_MainCamera.matView;// glm::lookAt(CamPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.matModel = matModel({}, glm::mat3(1.0), { 1,1,1 });
         ubo.Time = t;
 
         g_ubos[fif_i]->Upload(&ubo);
@@ -199,7 +265,18 @@ void RenderEngine::Render()
         cmd.Reset();
         cmd.Begin(vk::CommandBufferUsageFlagBits::eSimultaneousUse);
     }
+    {
+        ImGui::Begin("TmpDebug222");
+        if (ImGui::Button("ShowTheWiin"))
+        {
+            ImWindows::Show(ShowSomeWindow);
+        }
+        ImGui::End();
 
+
+        ImWindows::ShowWindows();
+
+    }
     vkx::BeginMainRenderPass(cmd);
     {
         cmd.BindGraphicsPipeline(g_Pipeline->Pipeline);
@@ -212,9 +289,7 @@ void RenderEngine::Render()
 
         cmd.cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, g_Pipeline->PipelineLayout, 0, g_Pipeline->DescriptorSets[fif_i], {});
 
-        cmd.DrawIndexed(6);
-
-        ImGui::ShowDemoWindow();
+        cmd.DrawIndexed(g_VBuffer->vertexCount);
 
         Imgui::Render(cmd);
 

@@ -52,7 +52,7 @@ add_executable(Ethertia
     src/ethertia/render/Window.cpp
     src/ethertia/render/RenderEngine.cpp
     src/ethertia/render/VertexData.cpp
-    src/ethertia/Ethertia.cpp)
+    src/ethertia/Ethertia.cpp  "src/ethertia/imgui/ImWindows.h" "src/ethertia/imgui/ImWindows.cpp" "src/stdx/stdx.h")
 
 
 target_link_libraries(Ethertia 

@@ -130,6 +130,7 @@ public:
     // interleaved vertex data. load to GPU, StagedBuffer. 
     static vkx::VertexBuffer* LoadVertexData(const VertexData* vtx);
 
+    // todo a bit silly, perfer Load uri, or sptr.get() in arg passing
     static vkx::VertexBuffer* LoadVertexData(std::shared_ptr<VertexData> vtx) { return Loader::LoadVertexData(vtx.get()); }
 
 
