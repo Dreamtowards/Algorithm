@@ -1531,9 +1531,6 @@ static vk::RenderPass _CreateMainRenderPass(
     dependency.srcAccessMask = vk::AccessFlagBits::eNone;
     dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;// | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
 
-//    vk::AttachmentReference colorAttachmentRef = { 0, vk::ImageLayout::eColorAttachmentOptimal };
-//    vk::AttachmentReference depthAttachmentRef = { 1, vk::ImageLayout::eDepthStencilAttachmentOptimal };
-
     return vkx::CreateRenderPass(
         {
             vkx::IAttachmentDesc(imageFormat, vk::ImageLayout::ePresentSrcKHR)//,
@@ -1541,8 +1538,8 @@ static vk::RenderPass _CreateMainRenderPass(
         },
         vkx::IGraphicsSubpass(
             vkx::IAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal)//,           // Color
-            //vkx::IAttachmentRef(1, vk::ImageLayout::eDepthStencilAttachmentOptimal)
-            ),   // Depth
+            //vkx::IAttachmentRef(1, vk::ImageLayout::eDepthStencilAttachmentOptimal)   // Depth
+        ),
         dependency);
 }
 
@@ -1630,7 +1627,7 @@ static void _CreateSwapchain(
     for (size_t i = 0; i < swapchainImageCount; i++)
     {
         out_SwapchainFramebuffers[i] = vkx::CreateFramebuffer(out_SwapchainExtent, renderPass,
-            { out_SwapchainImageViews[i] /*, out_SwapchainDepthImage->imageView */});
+            { out_SwapchainImageViews[i] /*, out_SwapchainDepthImage->imageView */ });
     }
 }
 

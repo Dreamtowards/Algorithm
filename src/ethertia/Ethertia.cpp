@@ -150,17 +150,22 @@ static void Destroy()
     Window::Destroy();
 }
 
+#include <ethertia/imgui/ImWindows.h>
 
 static void RunMainLoop()
 {
     if (Window::IsCloseRequested())
         Ethertia::Shutdown();
 
-    
-
-    RenderEngine::Render();
-
     Window::PollEvents();
+
+    {
+        ImWindows::ShowDockspaceAndMainMenubar();
+        Imgui::ShowWindows();
+
+        RenderEngine::Render();
+    }
+
 }
 
 

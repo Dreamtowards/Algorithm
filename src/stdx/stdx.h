@@ -29,4 +29,10 @@ namespace stdx
 	{
 		return std::find(ls.begin(), ls.end(), val) != ls.end();
 	}
+
+    template<typename T>
+    static T* ptr(const T& ref)
+    {
+        return reinterpret_cast<T*>(&ref);
+    }
 }

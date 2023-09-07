@@ -1,14 +1,21 @@
 
 
+
+
 #include "ImWindows.h"
 
 #include <ethertia/imgui/Imgui.h>
 #include <ethertia/Ethertia.h>
 
+#include <stdx/stdx.h>
+
+#include <ethertia/util/Log.h>
+#include <ethertia/util/Loader.h>
 
 
 #pragma region Main Dockspace & Menubar
 
+#include <filesystem>
 
 static void _MenuSystem()
 {
@@ -26,45 +33,45 @@ static void _MenuSystem()
 
         ImGui::EndMenu();
     }
-    //ImGui::Separator();
-    //
-    //if (ImGui::BeginMenu("Open World"))
-    //{
-    //    if (ImGui::MenuItem("New World..")) {
-    //        w_NewWorld = true;
-    //    }
-    //    if (ImGui::MenuItem("Open World..")) {
-    //        const char* filename = Loader::openFolderDialog("Open World..", "./saves/");  //std::filesystem::current_path().append("/saves/").string().c_str());
-    //        if (filename) {
-    //            Log::info("Open world: ", filename);
-    //            Ethertia::loadWorld(filename);
-    //        }
-    //    }
-    //
-    //    //ImGui::SeparatorText("Saves");
-    //    ImGui::Separator();
-    //    ImGui::TextDisabled("Saves:");
-    //
-    //    if (Loader::fileExists("saves/"))
-    //    {
-    //        for (const auto& savedir : std::filesystem::directory_iterator("saves/"))
-    //        {
-    //            //            std::string size_str = Strings::size_str(Loader::calcDirectorySize(savedir.path()));
-    //
-    //            float epoch = std::chrono::duration_cast<std::chrono::seconds>(savedir.last_write_time().time_since_epoch()).count();
-    //            if (epoch < 0)  epoch = 0;  // Error on Windows.
-    //            std::string time_str = Strings::time_fmt(epoch);
-    //
-    //            auto filename = savedir.path().filename();
-    //            if (ImGui::MenuItem((const char*)filename.c_str(), time_str.c_str()))
-    //            {
-    //                Ethertia::loadWorld(savedir.path().string());
-    //            }
-    //        }
-    //    }
-    //
-    //    ImGui::EndMenu();
-    //}
+    ImGui::Separator();
+
+    if (ImGui::BeginMenu("Open World"))
+    {
+        if (ImGui::MenuItem("New World..")) {
+            //ImWindows::Show();
+        }
+        if (ImGui::MenuItem("Open World..")) {
+            const char* filename = Loader::OpenFileDialog("Open World..", "./saves/");  //std::filesystem::current_path().append("/saves/").string().c_str());
+            if (filename) {
+                Log::info("Open world: ", filename);
+//                Ethertia::LoadWorld(filename);
+            }
+        }
+
+        //ImGui::SeparatorText("Saves");
+        ImGui::Separator();
+        ImGui::TextDisabled("Saves:");
+
+        if (Loader::FileExists("saves/"))
+        {
+            for (const auto& savedir : std::filesystem::directory_iterator("saves/"))
+            {
+                //            std::string size_str = Strings::size_str(Loader::calcDirectorySize(savedir.path()));
+
+                float epoch = std::chrono::duration_cast<std::chrono::seconds>(savedir.last_write_time().time_since_epoch()).count();
+                if (epoch < 0)  epoch = 0;  // Error on Windows.
+                std::string time_str = "_time";// Strings::time_fmt(epoch);
+
+                auto filename = savedir.path().filename();
+                if (ImGui::MenuItem((const char*)filename.c_str(), time_str.c_str()))
+                {
+                    //Ethertia::loadWorld(savedir.path().string());
+                }
+            }
+        }
+
+        ImGui::EndMenu();
+    }
     //
     //bool worldvalid = Ethertia::getWorld();
     //if (ImGui::MenuItem("Edit World..", nullptr, false, worldvalid))
@@ -112,11 +119,6 @@ static void _MenuSystem()
     }
 }
 
-template<typename T>
-static T* ptr(const T& ref)
-{
-    return (T*) &ref;
-}
 
 static void ShowMainMenuBar()
 {
@@ -220,7 +222,7 @@ static void ShowMainMenuBar()
 
             if (ImGui::BeginMenu("Debug"))
             {
-                ImWindows::Checkbox("ImGui DemoWindow", ImGui::ShowDemoWindow);
+                Imgui::ToggleDrawCheckbox("ImGui::DemoWindow", ImGui::ShowDemoWindow);
 
                 ImGui::EndMenu();
             }
@@ -309,63 +311,6 @@ static void ShowDockspaceAndMainMenubar()
     ImGui::End();
 }
 
-
-
-
-#include <stdx/stdx.h>
-
-#include <ethertia/util/Log.h>
-
-void ImWindows::Show(FuncPtr w)
-{
-    if (Has(w))
-    {
-        Log::info("Failed to ShowWindow, Existed Already");
-        return;
-    }
-    ImWindows::Windows.push_back(w);
-}
-
-bool ImWindows::Has(FuncPtr w)
-{
-    return stdx::exists(ImWindows::Windows, w);  //auto& ls = ImWindows::Windows;std::find(ls.begin(), ls.end(), w) != ls.end();
-}
-
-void ImWindows::Close(FuncPtr w)
-{
-    stdx::erase(ImWindows::Windows, w);
-}
-
-void ImWindows::ShowWindows()
-{
-    ShowDockspaceAndMainMenubar();
-
-    auto& windows = ImWindows::Windows;
-    for (int i = windows.size()-1; i >= 0; --i)
-    {
-        bool show = true;
-
-        windows[i](&show);
-
-        if (!show) 
-        {
-            stdx::erase(windows, i);
-        }
-    }
-}
-
-void ImWindows::Checkbox(const char* label, FuncPtr w)
-{
-    bool show = ImWindows::Has(w);
-    if (ImGui::Checkbox("ImGui DemoWindow", &show)) 
-    {
-        if (show) {
-            ImWindows::Show(w);
-        } else {
-            ImWindows::Close(w);
-        }
-    }
-}
 
 
 

@@ -72,9 +72,9 @@ void Imgui::Init()
         ImGuiConfigFlags_ViewportsEnable;   // Multiple Windows/Viewports
         ImGuiConfigFlags_DpiEnableScaleFonts |
         ImGuiConfigFlags_DpiEnableScaleViewports;
-    //io.ConfigViewportsNoDecoration = false;
-    //io.ConfigViewportsNoTaskBarIcon = true;
-    //ImGui::GetMainViewport()->DpiScale = 4;
+    io.ConfigViewportsNoDecoration = false;
+    io.ConfigViewportsNoTaskBarIcon = true;
+    ImGui::GetMainViewport()->DpiScale = 4;
 
     InitForVulkan();
 
@@ -122,6 +122,60 @@ void Imgui::Render(vk::CommandBuffer cmdbuf)
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
         //glfwMakeContextCurrent(backup_current_context);
+    }
+}
+
+
+
+
+#include <stdx/stdx.h>
+
+void Imgui::Show(DrawFuncPtr w)
+{
+    if (Has(w))
+    {
+        Log::info("Failed to ShowWindow, Existed Already");
+        return;
+    }
+    Imgui::Windows.push_back(w);
+}
+
+bool Imgui::Has(DrawFuncPtr w)
+{
+    return stdx::exists(Imgui::Windows, w);  //auto& ls = ImWindows::Windows;std::find(ls.begin(), ls.end(), w) != ls.end();
+}
+
+void Imgui::Close(DrawFuncPtr w)
+{
+    stdx::erase(Imgui::Windows, w);
+}
+
+void Imgui::ShowWindows()
+{
+    auto& windows = Imgui::Windows;
+    for (size_t i = windows.size()-1; i >= 0; --i)
+    {
+        bool show = true;
+
+        windows[i](&show);
+
+        if (!show)
+        {
+            stdx::erase(windows, i);
+        }
+    }
+}
+
+void Imgui::ToggleDrawCheckbox(const char* label, DrawFuncPtr w)
+{
+    bool show = Imgui::Has(w);
+    if (ImGui::Checkbox(label, &show))
+    {
+        if (show) {
+            Imgui::Show(w);
+        } else {
+            Imgui::Close(w);
+        }
     }
 }
 
